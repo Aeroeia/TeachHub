@@ -1,0 +1,44 @@
+server:
+  port: 8081  #端口
+  tomcat:
+    uri-encoding: UTF-8   #服务编码
+spring:
+  profiles:
+    active: dev
+  application:
+    name: auth-service
+  cloud:
+    nacos:
+      config:
+        file-extension: yaml
+        shared-configs: # 共享配置
+          - data-id: shared-spring.yaml # 共享spring配置
+            refresh: false
+          - data-id: shared-redis.yaml # 共享redis配置
+            refresh: false
+          - data-id: shared-mybatis.yaml # 共享mybatis配置
+            refresh: false
+          - data-id: shared-logs.yaml # 共享日志配置
+            refresh: false
+encrypt:
+  key-store:
+    alias: teachubxt  #别名
+    location: classpath:teachubxt.jks  #KeyStore 证书库名称
+    password: teachub123321   #证书库密码
+    secret: teachub123321   #秘钥
+teachub:
+  swagger:
+    enable: true
+    enableResponseWrap: true
+    package-path: com.teachub.auth.controller
+    title: TeachHub - 权限微服务接口文档
+    description: 该服务用于管理权限相关信息
+    version: v1.0
+  auth:
+    resource:
+      enable: true
+      includeLoginPaths:
+        - /menus/me
+        - /accounts/logout
+  jdbc:
+    database: teachub_auth
