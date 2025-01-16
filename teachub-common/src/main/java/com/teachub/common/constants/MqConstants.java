@@ -27,6 +27,8 @@ public interface MqConstants {
     }
     interface Queue {
         String ERROR_QUEUE_TEMPLATE = "error.{}.queue";
+        //课表相关队列
+        String LEARNING_LESSON_PAY_QUEUE = "learning_lesson_pay.queue";
     }
     interface Key{
         /*课程有关的 RoutingKey*/

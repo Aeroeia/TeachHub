@@ -10,6 +10,7 @@ import com.teachub.learning.enums.LessonStatus;
 import com.teachub.learning.enums.PlanStatus;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
+import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
@@ -27,12 +28,13 @@ import lombok.experimental.Accessors;
 @Accessors(chain = true)
 @TableName("learning_lesson")
 @ApiModel(value="LearningLesson对象", description="学生课程表")
+@Builder
 public class LearningLesson implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     @ApiModelProperty(value = "主键")
-    @TableId(value = "id", type = IdType.ASSIGN_ID)
+    @TableId(value = "id", type = IdType.ASSIGN_ID) //使用雪花算法生成唯一id 用于分布式
     private Long id;
 
     @ApiModelProperty(value = "学员id")

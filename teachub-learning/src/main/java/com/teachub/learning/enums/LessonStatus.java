@@ -23,6 +23,7 @@ public enum LessonStatus implements BaseEnum {
         this.desc = desc;
     }
 
+    //反序列化时转为枚举类型
     @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
     public static LessonStatus of(Integer value){
         if (value == null) {
