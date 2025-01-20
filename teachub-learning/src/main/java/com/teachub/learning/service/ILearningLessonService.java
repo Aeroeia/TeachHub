@@ -1,7 +1,10 @@
 package com.teachub.learning.service;
 
+import com.teachub.common.domain.dto.PageDTO;
+import com.teachub.common.domain.query.PageQuery;
 import com.teachub.learning.domain.po.LearningLesson;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.teachub.learning.domain.vo.LearningLessonVO;
 
 import java.util.List;
 
@@ -16,4 +19,6 @@ import java.util.List;
 public interface ILearningLessonService extends IService<LearningLesson> {
 
     void saveLearningLeesons(Long userId, List<Long> courseIds);
+
+    PageDTO<LearningLessonVO> queryMyLesson(Long userId, PageQuery pageQuery);
 }
