@@ -43,4 +43,15 @@ public class LearningLessonController {
         PageDTO<LearningLessonVO> result = learningLessonService.queryMyLesson(userId, pageQuery);
         return result;
     }
+    @ApiOperation("查询正在学习的课程")
+    @GetMapping("/now")
+    public LearningLessonVO getNowLesson(){
+        Long userId = UserContext.getUser();
+        log.info("当前用户id:{}",userId);
+        if(userId==null){
+            throw new BadRequestException("获取用户id失败");
+        }
+        LearningLessonVO result = learningLessonService.getNowLesson(userId);
+        return result;
+    }
 }

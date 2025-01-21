@@ -2,14 +2,19 @@ package com.teachub.learning.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.teachub.api.client.course.CatalogueClient;
 import com.teachub.api.client.course.CourseClient;
+import com.teachub.api.dto.course.CataSimpleInfoDTO;
+import com.teachub.api.dto.course.CourseFullInfoDTO;
 import com.teachub.api.dto.course.CourseSimpleInfoDTO;
 import com.teachub.common.constants.Constant;
 import com.teachub.common.domain.dto.PageDTO;
 import com.teachub.common.domain.query.PageQuery;
+import com.teachub.common.exceptions.BizIllegalException;
 import com.teachub.common.utils.CollUtils;
 import com.teachub.learning.domain.po.LearningLesson;
 import com.teachub.learning.domain.vo.LearningLessonVO;
+import com.teachub.learning.enums.LessonStatus;
 import com.teachub.learning.mapper.LearningLessonMapper;
 import com.teachub.learning.service.ILearningLessonService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -34,6 +39,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper, LearningLesson> implements ILearningLessonService {
     private final CourseClient courseClient;
+    private final CatalogueClient catalogueClient;
     @Override
     public void saveLearningLeesons(Long userId, List<Long> ids) {
         //1.远程调用course微服务得到课程信息
@@ -76,5 +82,39 @@ public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper,
             result.add(learningLessonVO);
         }
         return PageDTO.of(pages, result);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public LearningLessonVO getNowLesson(Long userId) {
+        LearningLesson learningLesson = this.lambdaQuery().eq(LearningLesson::getUserId, userId)
+                .eq(LearningLesson::getStatus, LessonStatus.LEARNING)
+                .orderByDesc(LearningLesson::getLatestLearnTime)
+                .last("limit 1")
+                .one();
+        if(learningLesson == null){
+            return null;
+        }
+        Integer count = this.lambdaQuery().eq(LearningLesson::getUserId, userId)
+                .count();
+        CourseFullInfoDTO courseInfo = courseClient.getCourseInfoById(learningLesson.getCourseId(), false, false);
+        if(courseInfo==null){
+            throw new BizIllegalException("课程不存在");
+        }
+        LearningLessonVO learningLessonVO = BeanUtil.copyProperties(learningLesson, LearningLessonVO.class);
+        learningLessonVO.setCourseName(courseInfo.getName());
+        learningLessonVO.setSections(courseInfo.getSectionNum());
+        learningLessonVO.setCourseCoverUrl(courseInfo.getCoverUrl());
+        learningLessonVO.setCourseAmount(count);
+        Long latestSectionId = learningLesson.getLatestSectionId();
+        List<CataSimpleInfoDTO> cataSimpleInfoDTOS = catalogueClient.batchQueryCatalogue(List.of(latestSectionId));
+        if(CollUtils.isEmpty(cataSimpleInfoDTOS)){
+            throw new BizIllegalException("小节不存在");
+        }
+        CataSimpleInfoDTO cataSimpleInfoDTO = cataSimpleInfoDTOS.get(0);
+        learningLessonVO.setLatestSectionIndex(cataSimpleInfoDTO.getCIndex());
+        learningLessonVO.setLatestSectionName(cataSimpleInfoDTO.getName());
+        return learningLessonVO;
+
     }
 }
