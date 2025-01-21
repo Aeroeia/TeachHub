@@ -11,10 +11,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 /**
  * <p>
@@ -53,5 +50,16 @@ public class LearningLessonController {
         }
         LearningLessonVO result = learningLessonService.getNowLesson(userId);
         return result;
+    }
+    @ApiOperation("删除课程")
+    @DeleteMapping("/{courseId}")
+    public void delete(@PathVariable Long courseId){
+        log.info("当前id:{}",courseId);
+        Long userId = UserContext.getUser();
+        log.info("当前用户ID:{}",userId);
+        if(userId==null){
+            throw new BadRequestException("获取用户id失败");
+        }
+        learningLessonService.delete(userId,courseId);
     }
 }

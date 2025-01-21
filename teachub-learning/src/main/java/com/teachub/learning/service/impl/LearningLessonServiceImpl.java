@@ -117,4 +117,17 @@ public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper,
         return learningLessonVO;
 
     }
+
+    @Override
+    public void delete(Long userId, Long courseId) {
+        LearningLesson lesson = this.lambdaQuery().eq(LearningLesson::getUserId, userId)
+                .eq(LearningLesson::getCourseId, courseId)
+                .one();
+        if(lesson==null){
+            throw new BizIllegalException("课表不存在该课程");
+        }
+        this.lambdaUpdate().eq(LearningLesson::getCourseId,courseId)
+                .eq(LearningLesson::getUserId,userId)
+                .remove();
+    }
 }
