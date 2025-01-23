@@ -11,10 +11,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 /**
  * <p>
@@ -53,5 +50,51 @@ public class LearningLessonController {
         }
         LearningLessonVO result = learningLessonService.getNowLesson(userId);
         return result;
+    }
+    @ApiOperation("删除课程")
+    @DeleteMapping("/{courseId}")
+    public void delete(@PathVariable Long courseId){
+        log.info("当前id:{}",courseId);
+        Long userId = UserContext.getUser();
+        log.info("当前用户ID:{}",userId);
+        if(userId==null){
+            throw new BadRequestException("获取用户id失败");
+        }
+        learningLessonService.delete(userId,courseId);
+    }
+    @ApiOperation("查询课程是否有效")
+    @GetMapping("/{courseId}/valid")
+    Long isLessonValid(@PathVariable("courseId") Long courseId){
+        log.info("课程id:{}",courseId);
+        if(courseId==null){
+            throw new BadRequestException("获取课程id失败");
+        }
+        Long userId = UserContext.getUser();
+        log.info("用户id:{}",userId);
+        if(userId==null){
+            throw new BadRequestException("获取用户id失败");
+        }
+        return learningLessonService.isLessonValid(userId,courseId);
+    }
+    @ApiOperation("查询当前用户是否有该课程")
+    @GetMapping("/{courseId}")
+    public LearningLessonVO queryLearningRecord(@PathVariable("courseId") Long courseId){
+        Long userId = UserContext.getUser();
+        if (userId == null) {
+            throw new BadRequestException("获取用户id失败");
+        }
+        if(courseId==null){
+            throw new BadRequestException("获取课程id失败");
+        }
+        return learningLessonService.queryLearningRecordByCourse(userId,courseId);
+    }
+    @ApiOperation("统计课程学习人数")
+    @GetMapping("/lessons/{courseId}/count")
+    public Integer countLearningLessonByCourse(@PathVariable("courseId") Long courseId){
+        log.info("课程id:{}",courseId);
+        if(courseId==null){
+            throw new BadRequestException("获取课程id失败");
+        }
+        return learningLessonService.countLearningLessonByCourse(courseId);
     }
 }

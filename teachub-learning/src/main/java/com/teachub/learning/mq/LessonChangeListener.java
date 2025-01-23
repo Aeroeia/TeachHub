@@ -37,4 +37,18 @@ public class LessonChangeListener {
         List<Long> courseIds = orderBasicDTO.getCourseIds();
         learningLessonService.saveLearningLeesons(userId,courseIds);
     }
+    @RabbitListener(bindings = @QueueBinding(
+            value = @Queue(name = MqConstants.Queue.LEARNING_LESSON_REFUND_QUEUE,durable = "true"),
+            exchange = @Exchange(name = MqConstants.Exchange.ORDER_EXCHANGE,type = ExchangeTypes.TOPIC),
+            key = MqConstants.Key.ORDER_REFUND_KEY
+    ))
+    public void onRefundMessage(OrderBasicDTO orderBasicDTO){
+        log.info("收到退课通知：{}",orderBasicDTO);
+        if(orderBasicDTO==null){
+            return;
+        }
+        Long userId = orderBasicDTO.getUserId();
+        Long courseId = orderBasicDTO.getCourseIds().get(0);
+        learningLessonService.delete(userId,courseId);
+    }
 }

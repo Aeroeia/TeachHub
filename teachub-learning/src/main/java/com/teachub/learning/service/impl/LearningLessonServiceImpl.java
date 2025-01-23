@@ -117,4 +117,58 @@ public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper,
         return learningLessonVO;
 
     }
+
+    @Override
+    public void delete(Long userId, Long courseId) {
+        LearningLesson lesson = this.lambdaQuery().eq(LearningLesson::getUserId, userId)
+                .eq(LearningLesson::getCourseId, courseId)
+                .one();
+        if(lesson==null){
+            throw new BizIllegalException("课表不存在该课程");
+        }
+        this.lambdaUpdate().eq(LearningLesson::getCourseId,courseId)
+                .eq(LearningLesson::getUserId,userId)
+                .remove();
+    }
+
+    @Override
+    public Long isLessonValid(Long userId, Long courseId) {
+        LearningLesson lesson = this.lambdaQuery().eq(LearningLesson::getCourseId, courseId)
+                .eq(LearningLesson::getUserId, userId)
+                .one();
+        if(lesson==null){
+            throw new BizIllegalException("课程不存在");
+        }
+        if(lesson.getStatus()==LessonStatus.EXPIRED){
+            throw new BizIllegalException("课程已过期");
+        }
+        return lesson.getId();
+    }
+
+    @Override
+    public LearningLessonVO queryLearningRecordByCourse(Long userId, Long courseId) {
+        LearningLesson lesson = this.lambdaQuery().eq(LearningLesson::getUserId, userId)
+                .eq(LearningLesson::getCourseId, courseId)
+                .one();
+        if(lesson==null){
+            return null;
+        }
+        return LearningLessonVO.builder()
+                .id(lesson.getId())
+                .courseId(lesson.getCourseId())
+                .status(lesson.getStatus())
+                .learnedSections(lesson.getLearnedSections())
+                .createTime(lesson.getCreateTime())
+                .expireTime(lesson.getExpireTime())
+                .planStatus(lesson.getPlanStatus())
+                .build();
+    }
+
+    @Override
+    public Integer countLearningLessonByCourse(Long courseId) {
+        return this.lambdaQuery().eq(LearningLesson::getCourseId, courseId)
+                .count();
+    }
+
+
 }
