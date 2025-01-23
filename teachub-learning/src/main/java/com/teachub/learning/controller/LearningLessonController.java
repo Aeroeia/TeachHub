@@ -88,4 +88,13 @@ public class LearningLessonController {
         }
         return learningLessonService.queryLearningRecordByCourse(userId,courseId);
     }
+    @ApiOperation("统计课程学习人数")
+    @GetMapping("/lessons/{courseId}/count")
+    public Integer countLearningLessonByCourse(@PathVariable("courseId") Long courseId){
+        log.info("课程id:{}",courseId);
+        if(courseId==null){
+            throw new BadRequestException("获取课程id失败");
+        }
+        return learningLessonService.countLearningLessonByCourse(courseId);
+    }
 }
