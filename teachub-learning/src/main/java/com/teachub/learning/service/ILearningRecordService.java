@@ -1,6 +1,7 @@
 package com.teachub.learning.service;
 
 import com.teachub.api.dto.leanring.LearningLessonDTO;
+import com.teachub.learning.domain.dto.LearningRecordFormDTO;
 import com.teachub.learning.domain.po.LearningRecord;
 import com.baomidou.mybatisplus.extension.service.IService;
 
@@ -15,4 +16,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 public interface ILearningRecordService extends IService<LearningRecord> {
 
     LearningLessonDTO queryLearningRecordByCourse(Long userID, Long courseId);
+
+    void commitLearningRecord(LearningRecordFormDTO learningRecordFormDTO);
+
 }

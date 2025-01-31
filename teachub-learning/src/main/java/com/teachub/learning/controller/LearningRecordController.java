@@ -4,16 +4,14 @@ package com.teachub.learning.controller;
 import com.teachub.api.dto.leanring.LearningLessonDTO;
 import com.teachub.common.exceptions.BadRequestException;
 import com.teachub.common.utils.UserContext;
+import com.teachub.learning.domain.dto.LearningRecordFormDTO;
 import com.teachub.learning.service.ILearningRecordService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
 
 /**
  * <p>
@@ -47,5 +45,11 @@ public class LearningRecordController {
             throw new BadRequestException("课程id为空");
         }
         return learningRecordService.queryLearningRecordByCourse(userID,courseId);
+    }
+    @ApiOperation("提交学习记录")
+    @PostMapping("/learning-records")
+    public void commitLearningRecord(@RequestBody @Validated LearningRecordFormDTO learningRecordFormDTO) {
+        log.info("学习记录:{}", learningRecordFormDTO);
+        learningRecordService.commitLearningRecord(learningRecordFormDTO);
     }
 }
