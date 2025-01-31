@@ -89,7 +89,6 @@ public class LearningRecordServiceImpl extends ServiceImpl<LearningRecordMapper,
 
 **解决方法：**
 1. 采用懒注入 @Lazy
-2. 注入下一层：Mapper
 ```java
 @Service
 public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper, LearningLesson> implements ILearningLessonService {
@@ -105,3 +104,4 @@ public class LearningRecordServiceImpl extends ServiceImpl<LearningRecordMapper,
         private ILearningLessonService learningLessonService;
 }
 ```
+2. 注入下一层：Mapper
