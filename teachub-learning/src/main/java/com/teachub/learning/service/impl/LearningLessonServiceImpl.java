@@ -10,11 +10,15 @@ import com.teachub.api.dto.course.CourseSimpleInfoDTO;
 import com.teachub.common.constants.Constant;
 import com.teachub.common.domain.dto.PageDTO;
 import com.teachub.common.domain.query.PageQuery;
+import com.teachub.common.exceptions.BadRequestException;
 import com.teachub.common.exceptions.BizIllegalException;
 import com.teachub.common.utils.CollUtils;
+import com.teachub.common.utils.UserContext;
+import com.teachub.learning.domain.dto.LearningPlanDTO;
 import com.teachub.learning.domain.po.LearningLesson;
 import com.teachub.learning.domain.vo.LearningLessonVO;
 import com.teachub.learning.enums.LessonStatus;
+import com.teachub.learning.enums.PlanStatus;
 import com.teachub.learning.mapper.LearningLessonMapper;
 import com.teachub.learning.service.ILearningLessonService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -184,6 +188,20 @@ public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper,
         }
         this.lambdaUpdate().in(LearningLesson::getId,updateList)
                 .set(LearningLesson::getStatus,LessonStatus.EXPIRED);
+    }
+
+    @Override
+    public void savePlans(LearningPlanDTO learningPlanDTO) {
+        Long userId = UserContext.getUser();
+        if(userId==null){
+            throw new BadRequestException("获取用户id失败");
+        }
+        Long courseId = learningPlanDTO.getCourseId();
+        this.lambdaUpdate().eq(LearningLesson::getUserId,userId)
+                .eq(LearningLesson::getCourseId,courseId)
+                .set(LearningLesson::getPlanStatus, PlanStatus.PLAN_RUNNING)
+                .set(LearningLesson::getWeekFreq,learningPlanDTO.getFreq())
+                .update();
     }
 
 }
