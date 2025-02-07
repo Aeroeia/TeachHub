@@ -5,12 +5,15 @@ import com.teachub.common.domain.dto.PageDTO;
 import com.teachub.common.domain.query.PageQuery;
 import com.teachub.common.exceptions.BadRequestException;
 import com.teachub.common.utils.UserContext;
+import com.teachub.learning.domain.dto.LearningPlanDTO;
 import com.teachub.learning.domain.vo.LearningLessonVO;
+import com.teachub.learning.domain.vo.LearningPlanPageVO;
 import com.teachub.learning.service.ILearningLessonService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -76,7 +79,7 @@ public class LearningLessonController {
         }
         return learningLessonService.isLessonValid(userId,courseId);
     }
-    @ApiOperation("查询当前用户是否有该课程")
+    @ApiOperation("查询当前用户指定课程状态")
     @GetMapping("/{courseId}")
     public LearningLessonVO queryLearningRecord(@PathVariable("courseId") Long courseId){
         Long userId = UserContext.getUser();
@@ -89,12 +92,26 @@ public class LearningLessonController {
         return learningLessonService.queryLearningRecordByCourse(userId,courseId);
     }
     @ApiOperation("统计课程学习人数")
-    @GetMapping("/lessons/{courseId}/count")
+    @GetMapping("/{courseId}/count")
     public Integer countLearningLessonByCourse(@PathVariable("courseId") Long courseId){
         log.info("课程id:{}",courseId);
         if(courseId==null){
             throw new BadRequestException("获取课程id失败");
         }
         return learningLessonService.countLearningLessonByCourse(courseId);
+    }
+    @ApiOperation("创建学习计划")
+    @PostMapping("/plans")
+    public void savePlans(@RequestBody @Validated LearningPlanDTO learningPlanDTO){
+        log.info("学习计划:{}",learningPlanDTO);
+        learningLessonService.savePlans(learningPlanDTO);
+    }
+
+    @ApiOperation("查看学习计划")
+    @GetMapping("/plans")
+    public LearningPlanPageVO queryMyPlan(PageQuery pageQuery){
+        log.info("分页查询参数:{}",pageQuery);
+        log.info("查看学习计划");
+        return learningLessonService.queryMyPlan(pageQuery);
     }
 }
