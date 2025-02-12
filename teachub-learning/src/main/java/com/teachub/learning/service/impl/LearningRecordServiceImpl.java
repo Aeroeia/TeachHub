@@ -1,6 +1,8 @@
 package com.teachub.learning.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.db.DbRuntimeException;
+
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.teachub.api.client.course.CourseClient;
 import com.teachub.api.dto.course.CourseFullInfoDTO;
@@ -20,7 +22,13 @@ import com.teachub.learning.service.ILearningLessonService;
 import com.teachub.learning.service.ILearningRecordService;
 import com.teachub.learning.utils.LearningRecordDelayTaskHandler;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -34,6 +42,7 @@ import java.util.stream.Collectors;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class LearningRecordServiceImpl extends ServiceImpl<LearningRecordMapper, LearningRecord> implements ILearningRecordService {
     private final ILearningLessonService learningLessonService;
     private final CourseClient courseClient;
@@ -105,7 +114,7 @@ public class LearningRecordServiceImpl extends ServiceImpl<LearningRecordMapper,
                 .set(isAllFinished, LearningLesson::getStatus, LessonStatus.FINISHED)
                 .set(LearningLesson::getLatestLearnTime, learningRecordFormDTO.getCommitTime())
                 .set(LearningLesson::getLatestSectionId, learningRecordFormDTO.getSectionId())
-                .setSql(isFinished, "learned_sections=learned_sections+1") //原子性
+                .setSql("learned_sections=learned_sections+1") //原子性
                 .update();
     }
 
@@ -136,7 +145,6 @@ public class LearningRecordServiceImpl extends ServiceImpl<LearningRecordMapper,
             if (!save) {
                 throw new BizIllegalException("新增学习记录失败");
             }
-            learningRecordDelayTaskHandler.addLearningRecordTask(oldLearningRecord);
             return false;
         }
         //判断是否第一次学完
@@ -152,7 +160,7 @@ public class LearningRecordServiceImpl extends ServiceImpl<LearningRecordMapper,
             learningRecord.setSectionId(learningRecordFormDTO.getSectionId());
             learningRecord.setFinished(oldLearningRecord.getFinished());
             learningRecordDelayTaskHandler.addLearningRecordTask(learningRecord);
-            return finished;
+            return false;
         }
         boolean update = this.lambdaUpdate().eq(LearningRecord::getId, oldLearningRecord.getId())
                 .set(LearningRecord::getMoment, learningRecordFormDTO.getMoment())
@@ -163,16 +171,21 @@ public class LearningRecordServiceImpl extends ServiceImpl<LearningRecordMapper,
             throw new DbRuntimeException("更新学习记录失败");
         }
         learningRecordDelayTaskHandler.cleanRecordCache(learningRecordFormDTO.getLessonId(), learningRecordFormDTO.getSectionId());
-        return finished;
+        return true;
     }
 
     private LearningRecord queryOldRecord(Long lessonId, Long sectionId) {
         LearningRecord learningRecord = learningRecordDelayTaskHandler.readRecordCache(lessonId, sectionId);
-        if (learningRecord == null) {
-            learningRecord = this.lambdaQuery().eq(LearningRecord::getLessonId, lessonId)
-                    .eq(LearningRecord::getSectionId, sectionId)
-                    .one();
+        if (learningRecord != null) {
+            return learningRecord;
         }
+        learningRecord = this.lambdaQuery().eq(LearningRecord::getLessonId, lessonId)
+                .eq(LearningRecord::getSectionId, sectionId)
+                .one();
+        if(learningRecord==null){
+            return null;
+        }
+        learningRecordDelayTaskHandler.writeRecordCache(learningRecord);
         return learningRecord;
     }
 
