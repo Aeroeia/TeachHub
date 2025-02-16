@@ -134,6 +134,7 @@ private  ILearningRecordService learningRecordService;
 
 而播放进度信息，不管更新多少次，下一次续播肯定是从最后的一次播放进度开始续播。也就是说我们只需要记住最后一次即可。因此可以采用合并写方案来降低数据库写的次数和频率，而异步写做不到。  
 综上，提交播放进度业务虽然看起来复杂，但大多数请求的处理很简单，就是更新播放进度。并且播放进度数据是可以合并的（覆盖之前旧数据）。我们建议采用合并写请求方案：
+
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/redis.png)
 ---
 ### Redis数据结构设计
@@ -180,7 +181,6 @@ private  ILearningRecordService learningRecordService;
 但问题来了，我们怎么知道哪一次提交是最后一次提交呢？
 >只要用户一直在提交记录，Redis中的播放进度就会一直变化。如果Redis中的播放进度不变，肯定是停止了播放，是最后一次提交。
 
-
 因此，我们只要能判断Redis中的播放进度是否变化即可。怎么判断呢？
 每当前端提交播放记录时，我们可以设置一个延迟任务并保存这次提交的进度。等待20秒后（因为前端每15秒提交一次，20秒就是等待下一次提交），检查Redis中的缓存的进度与任务中的进度是否一致。
 - 不一致：说明持续在提交，无需处理
@@ -188,3 +188,4 @@ private  ILearningRecordService learningRecordService;
 
 **流程如下**
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/op.png)
+## 问答系统
