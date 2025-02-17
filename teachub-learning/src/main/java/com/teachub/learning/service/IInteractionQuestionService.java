@@ -16,4 +16,5 @@ public interface IInteractionQuestionService extends IService<InteractionQuestio
 
     void addQuestion(QuestionFormDTO questionFormDTO);
 
+    void updateQuestion(QuestionFormDTO questionFormDTO, Long id);
 }

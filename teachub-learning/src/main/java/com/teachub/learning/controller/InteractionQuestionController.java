@@ -31,4 +31,10 @@ public class InteractionQuestionController {
         log.info("问题;{}",questionFormDTO);
         interactionQuestionService.addQuestion(questionFormDTO);
     }
+    @ApiOperation("修改问题")
+    @PutMapping("/{id}")
+    public void updateQuestion(@RequestBody QuestionFormDTO questionFormDTO,@PathVariable Long id){
+        log.info("问题:{}",questionFormDTO);
+        interactionQuestionService.updateQuestion(questionFormDTO,id);
+    }
 }
