@@ -1,7 +1,10 @@
 package com.teachub.learning.controller;
 
 
+import com.teachub.common.domain.dto.PageDTO;
 import com.teachub.learning.domain.dto.QuestionFormDTO;
+import com.teachub.learning.domain.dto.QuestionPageQuery;
+import com.teachub.learning.domain.vo.QuestionVO;
 import com.teachub.learning.service.IInteractionQuestionService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -36,5 +39,11 @@ public class InteractionQuestionController {
     public void updateQuestion(@RequestBody QuestionFormDTO questionFormDTO,@PathVariable Long id){
         log.info("问题:{}",questionFormDTO);
         interactionQuestionService.updateQuestion(questionFormDTO,id);
+    }
+    @ApiOperation("分页查询问题")
+    @GetMapping("/page")
+    public PageDTO<QuestionVO> queryQuestions(@Validated QuestionPageQuery pageQuery){
+        log.info("分页查询参数:{}",pageQuery);
+        return interactionQuestionService.queryQuestions(pageQuery);
     }
 }
