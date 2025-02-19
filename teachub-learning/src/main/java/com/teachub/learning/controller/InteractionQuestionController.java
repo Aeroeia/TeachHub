@@ -52,4 +52,10 @@ public class InteractionQuestionController {
         log.info("问题id:{}",id);
         return interactionQuestionService.queryById(id);
     }
+    @ApiOperation("删除问题")
+    @DeleteMapping("/{id}")
+    public void delete(@PathVariable Long id){
+        log.info("问题id:{}",id);
+        interactionQuestionService.delete(id);
+    }
 }

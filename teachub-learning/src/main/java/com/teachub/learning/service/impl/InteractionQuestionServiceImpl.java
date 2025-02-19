@@ -151,4 +151,23 @@ public class InteractionQuestionServiceImpl extends ServiceImpl<InteractionQuest
         }
         return questionVO;
     }
+
+    @Override
+    public void delete(Long id) {
+        Long userId = UserContext.getUser();
+        if(userId==null){
+            throw new BadRequestException("用户未登录");
+        }
+        InteractionQuestion interactionQuestion = this.lambdaQuery().eq(InteractionQuestion::getId, id).one();
+        if(interactionQuestion==null){
+            throw new BadRequestException("问题不存在");
+        }
+        if(!userId.equals(interactionQuestion.getUserId())){
+            throw new BizIllegalException("不能删除他人问题");
+        }
+        boolean remove = this.lambdaUpdate().eq(InteractionQuestion::getId, id).remove();
+        if(!remove){
+            throw new BizIllegalException("删除问题失败");
+        }
+    }
 }
