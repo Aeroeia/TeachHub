@@ -46,4 +46,10 @@ public class InteractionQuestionController {
         log.info("分页查询参数:{}",pageQuery);
         return interactionQuestionService.queryQuestions(pageQuery);
     }
+    @ApiOperation("根据id查看问题详情")
+    @GetMapping("/{id}")
+    public QuestionVO queryQuestionById(@PathVariable Long id){
+        log.info("问题id:{}",id);
+        return interactionQuestionService.queryById(id);
+    }
 }
