@@ -189,3 +189,5 @@ private  ILearningRecordService learningRecordService;
 **流程如下**
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/op.png)
 ## 问答系统
+### 三级缓存
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/Caffeine_Redis.png)
