@@ -1,6 +1,7 @@
 package com.teachub.api.cache;
 
 import com.github.benmanes.caffeine.cache.Cache;
+
 import com.teachub.api.client.course.CategoryClient;
 import com.teachub.api.dto.course.CategoryBasicDTO;
 import com.teachub.common.utils.CollUtils;
@@ -19,8 +20,9 @@ public class CategoryCache {
 
     private final CategoryClient categoryClient;
 
+
     public Map<Long, CategoryBasicDTO> getCategoryMap() {
-        return categoryCaches.get("CATEGORY", key -> {
+        return categoryCaches.get(Constant.CAFFEINE_CACHE_NAME, key -> {
             // 1.从CategoryClient查询
             List<CategoryBasicDTO> list = categoryClient.getAllOfOneLevel();
             if (list == null || list.isEmpty()) {

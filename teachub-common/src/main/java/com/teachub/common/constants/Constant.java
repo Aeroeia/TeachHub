@@ -1,6 +1,9 @@
 package com.teachub.common.constants;
 
 public interface Constant {
+    String CAFFEINE_CACHE_NAME = "CATEGORY";
+    String REDIS_CACHE_NAME = "CATEGORY";
+
     String REQUEST_ID_HEADER = "requestId";
     String REQUEST_FROM_HEADER = "x-request-from";
 
@@ -25,11 +28,10 @@ public interface Constant {
     // 数据字段 - creater
     String DATA_FIELD_NAME_CREATER = "creater";
 
-    // 数据字段 - updater
-    String DATA_FIELD_NAME_UPDATER = "updater";
-
     // 数据字段 - latest_learn_time
     String LATEST_LEARN_TIME = "latest_learn_time";
+    // 数据字段 - updater
+    String DATA_FIELD_NAME_UPDATER = "updater";
 
     // 数据已经删除标识值
     boolean DATA_DELETE = true;
