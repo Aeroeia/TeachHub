@@ -3,7 +3,6 @@ package com.teachub.learning.service.impl;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.metadata.TableFieldInfo;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.teachub.api.cache.CategoryCache;
 import com.teachub.api.client.course.CatalogueClient;
@@ -11,6 +10,7 @@ import com.teachub.api.client.course.CourseClient;
 import com.teachub.api.client.search.SearchClient;
 import com.teachub.api.client.user.UserClient;
 import com.teachub.api.dto.course.CataSimpleInfoDTO;
+import com.teachub.api.dto.course.CourseFullInfoDTO;
 import com.teachub.api.dto.course.CourseSimpleInfoDTO;
 import com.teachub.api.dto.user.UserDTO;
 import com.teachub.common.domain.dto.PageDTO;
@@ -263,5 +263,46 @@ public class InteractionQuestionServiceImpl extends ServiceImpl<InteractionQuest
                 .update();
     }
 
-
+    @Override
+    public QuestionAdminVO queryDetailsById(Long id) {
+        InteractionQuestion interactionQuestion = this.lambdaQuery().eq(InteractionQuestion::getId, id).one();
+        if(interactionQuestion==null){
+            throw new BizIllegalException("不存在该问题");
+        }
+        QuestionAdminVO questionAdminVO = BeanUtils.copyBean(interactionQuestion, QuestionAdminVO.class);
+        Long userId = interactionQuestion.getUserId();
+        Long courseId = interactionQuestion.getCourseId();
+        Long chapterId = interactionQuestion.getChapterId();
+        Long sectionId = interactionQuestion.getSectionId();
+        //查询用户名
+        UserDTO userDTO = userClient.queryUserById(userId);
+        questionAdminVO.setUserName(userDTO.getName());
+        //查询课程名
+        CourseFullInfoDTO courseInfoById = courseClient.getCourseInfoById(courseId, false, false);
+        questionAdminVO.setCourseName(courseInfoById.getName());
+        //进行分类拼接
+        List<Long> categoryIds = courseInfoById.getCategoryIds();
+        String categoryNames = categoryCache.getCategoryNames(categoryIds);
+        questionAdminVO.setCategoryName(categoryNames);
+        //查询章节名
+        List<Long> ids = new ArrayList<>();
+        if(chapterId!=null){
+            ids.add(chapterId);
+        }
+        if(sectionId!=null){
+            ids.add(sectionId);
+        }
+        if(CollUtils.isEmpty(ids)){
+            return questionAdminVO;
+        }
+        List<CataSimpleInfoDTO> cataSimpleInfoDTOS = catalogueClient.batchQueryCatalogue(ids);
+        Map<Long, String> cataMap = cataSimpleInfoDTOS.stream().collect(Collectors.toMap(CataSimpleInfoDTO::getId, CataSimpleInfoDTO::getName));
+        if(chapterId!=null){
+            questionAdminVO.setChapterName(cataMap.get(chapterId));
+        }
+        if(sectionId!=null){
+            questionAdminVO.setSectionName(cataMap.get(sectionId));
+        }
+        return questionAdminVO;
+    }
 }
