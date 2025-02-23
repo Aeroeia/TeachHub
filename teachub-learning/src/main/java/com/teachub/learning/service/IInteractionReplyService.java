@@ -19,5 +19,5 @@ public interface IInteractionReplyService extends IService<InteractionReply> {
 
     void postReply(ReplyDTO replyDTO);
 
-    PageDTO<ReplyVO> pageQuery(ReplyPageQuery replyPageQuery);
+    PageDTO<ReplyVO> pageQuery(ReplyPageQuery replyPageQuery,boolean isAdmin);
 }

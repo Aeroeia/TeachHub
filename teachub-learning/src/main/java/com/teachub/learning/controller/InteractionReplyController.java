@@ -37,7 +37,7 @@ public class InteractionReplyController {
     @GetMapping("/page")
     public PageDTO<ReplyVO> pageQuery(ReplyPageQuery replyPageQuery){
         log.info("分页查询参数:{}",replyPageQuery);
-        return replyService.pageQuery(replyPageQuery);
+        return replyService.pageQuery(replyPageQuery,false);
     }
 
 }

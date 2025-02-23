@@ -60,17 +60,17 @@ public class InteractionReplyServiceImpl extends ServiceImpl<InteractionReplyMap
     }
 
     @Override
-    public PageDTO<ReplyVO> pageQuery(ReplyPageQuery replyPageQuery) {
+    public PageDTO<ReplyVO> pageQuery(ReplyPageQuery replyPageQuery, boolean isAdmin) {
         if (replyPageQuery.getQuestionId() != null) {
-            return handleQuestion(replyPageQuery);
+            return handleQuestion(replyPageQuery,isAdmin);
         }
-        return handleAnswer(replyPageQuery);
+        return handleAnswer(replyPageQuery,isAdmin);
     }
 
-    private PageDTO<ReplyVO> handleQuestion(ReplyPageQuery replyPageQuery) {
+    private PageDTO<ReplyVO> handleQuestion(ReplyPageQuery replyPageQuery, boolean isAdmin) {
         //构建分页条件
         Page<InteractionReply> page = this.lambdaQuery().eq(InteractionReply::getQuestionId, replyPageQuery.getQuestionId())
-                .eq(InteractionReply::getHidden, false)
+                .eq(!isAdmin,InteractionReply::getHidden, false)
                 .eq(InteractionReply::getAnswerId, 0)
                 .page(replyPageQuery.toMpPageDefaultSortByCreateTimeDesc());
         List<InteractionReply> records = page.getRecords();
@@ -87,7 +87,7 @@ public class InteractionReplyServiceImpl extends ServiceImpl<InteractionReplyMap
         //赋值
         for (ReplyVO replyVO : replyVOS) {
             replyVO.setUserType(userMap.get(replyVO.getUserId()).getType());
-            if (!replyVO.getAnonymity()) {
+            if (!replyVO.getAnonymity()||isAdmin) {
                 replyVO.setUserName(userMap.get(replyVO.getUserId()).getName());
                 replyVO.setUserIcon(userMap.get(replyVO.getUserId()).getIcon());
             }
@@ -96,10 +96,10 @@ public class InteractionReplyServiceImpl extends ServiceImpl<InteractionReplyMap
 
     }
 
-    private PageDTO<ReplyVO> handleAnswer(ReplyPageQuery replyPageQuery) {
+    private PageDTO<ReplyVO> handleAnswer(ReplyPageQuery replyPageQuery,boolean isAdmin) {
         //分页条件构造
         Page<InteractionReply> page = this.lambdaQuery().eq(InteractionReply::getAnswerId, replyPageQuery.getAnswerId())
-                .eq(InteractionReply::getHidden, false)
+                .eq(!isAdmin,InteractionReply::getHidden, false)
                 .page(replyPageQuery.toMpPageDefaultSortByCreateTimeDesc());
         List<InteractionReply> records = page.getRecords();
         //非空判断
@@ -120,7 +120,7 @@ public class InteractionReplyServiceImpl extends ServiceImpl<InteractionReplyMap
         List<ReplyVO> result = new ArrayList<>();
         for(InteractionReply reply : records){
             ReplyVO replyVO = BeanUtils.copyBean(reply, ReplyVO.class);
-            if(!replyVO.getAnonymity()){
+            if(!replyVO.getAnonymity()||isAdmin){
                 replyVO.setUserIcon(userMap.get(reply.getUserId()).getIcon());
                 replyVO.setUserName(userMap.get(reply.getUserId()).getName());
             }
