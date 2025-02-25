@@ -1,5 +1,6 @@
 package com.teachub.learning.controller;
 
+
 import com.teachub.common.domain.dto.PageDTO;
 import com.teachub.learning.domain.dto.ReplyPageQuery;
 import com.teachub.learning.domain.vo.ReplyVO;
@@ -8,9 +9,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @Slf4j
@@ -24,5 +23,11 @@ public class InteractionReplayAdminController {
     public PageDTO<ReplyVO> pageQuery(ReplyPageQuery replyPageQuery){
         log.info("分页查询参数:{}",replyPageQuery);
         return replyService.pageQuery(replyPageQuery,true);
+    }
+    @ApiOperation("隐藏/显示评论")
+    @PutMapping("/{id}/hidden/{hidden}")
+    public void updateHidden(@PathVariable Long id, @PathVariable Boolean hidden){
+        log.info("隐藏/显示参数:id={},hidden={}",id,hidden);
+        replyService.updateHidden(id,hidden);
     }
 }

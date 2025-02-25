@@ -67,6 +67,14 @@ public class InteractionReplyServiceImpl extends ServiceImpl<InteractionReplyMap
         return handleAnswer(replyPageQuery,isAdmin);
     }
 
+    @Override
+    public void updateHidden(Long id, Boolean hidden) {
+        this.lambdaUpdate().eq(InteractionReply::getId,id)
+                .set(InteractionReply::getHidden,hidden)
+                .update();
+    }
+
+
     private PageDTO<ReplyVO> handleQuestion(ReplyPageQuery replyPageQuery, boolean isAdmin) {
         //构建分页条件
         Page<InteractionReply> page = this.lambdaQuery().eq(InteractionReply::getQuestionId, replyPageQuery.getQuestionId())
