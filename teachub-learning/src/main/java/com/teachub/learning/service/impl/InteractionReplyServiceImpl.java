@@ -14,6 +14,7 @@ import com.teachub.learning.domain.dto.ReplyPageQuery;
 import com.teachub.learning.domain.po.InteractionQuestion;
 import com.teachub.learning.domain.po.InteractionReply;
 import com.teachub.learning.domain.vo.ReplyVO;
+import com.teachub.learning.enums.QuestionStatus;
 import com.teachub.learning.mapper.InteractionReplyMapper;
 import com.teachub.learning.service.IInteractionQuestionService;
 import com.teachub.learning.service.IInteractionReplyService;
@@ -51,34 +52,40 @@ public class InteractionReplyServiceImpl extends ServiceImpl<InteractionReplyMap
         }
         InteractionReply interactionReply = BeanUtils.copyBean(replyDTO, InteractionReply.class);
         interactionReply.setUserId(userId);
-        if (replyDTO.getIsStudent() != null && replyDTO.getIsStudent()) {
-            interactionQuestionService.lambdaUpdate().eq(InteractionQuestion::getId, replyDTO.getQuestionId())
-                    .setSql("answer_times=answer_times+1")
+        this.save(interactionReply);
+        //判断是否为问题回答
+        boolean isAnswer = replyDTO.getAnswerId() == null || replyDTO.getAnswerId() == 0;
+        if (!isAnswer) {
+            this.lambdaUpdate().eq(InteractionReply::getId, interactionReply.getAnswerId())
+                    .setSql("reply_times=reply_times+1")
                     .update();
         }
-        this.save(interactionReply);
+        interactionQuestionService.lambdaUpdate().eq(InteractionQuestion::getId, replyDTO.getQuestionId())
+                .setSql(isAnswer, "answer_times=answer_times+1")
+                .set(isAnswer, InteractionQuestion::getLatestAnswerId, userId)
+                .set(!replyDTO.getIsStudent(), InteractionQuestion::getStatus, QuestionStatus.CHECKED)
+                .update();
     }
 
     @Override
     public PageDTO<ReplyVO> pageQuery(ReplyPageQuery replyPageQuery, boolean isAdmin) {
         if (replyPageQuery.getQuestionId() != null) {
-            return handleQuestion(replyPageQuery,isAdmin);
+            return handleQuestion(replyPageQuery, isAdmin);
         }
-        return handleAnswer(replyPageQuery,isAdmin);
+        return handleAnswer(replyPageQuery, isAdmin);
     }
 
     @Override
     public void updateHidden(Long id, Boolean hidden) {
-        this.lambdaUpdate().eq(InteractionReply::getId,id)
-                .set(InteractionReply::getHidden,hidden)
+        this.lambdaUpdate().eq(InteractionReply::getId, id)
+                .set(InteractionReply::getHidden, hidden)
                 .update();
     }
-
 
     private PageDTO<ReplyVO> handleQuestion(ReplyPageQuery replyPageQuery, boolean isAdmin) {
         //构建分页条件
         Page<InteractionReply> page = this.lambdaQuery().eq(InteractionReply::getQuestionId, replyPageQuery.getQuestionId())
-                .eq(!isAdmin,InteractionReply::getHidden, false)
+                .eq(!isAdmin, InteractionReply::getHidden, false)
                 .eq(InteractionReply::getAnswerId, 0)
                 .page(replyPageQuery.toMpPageDefaultSortByCreateTimeDesc());
         List<InteractionReply> records = page.getRecords();
@@ -95,7 +102,7 @@ public class InteractionReplyServiceImpl extends ServiceImpl<InteractionReplyMap
         //赋值
         for (ReplyVO replyVO : replyVOS) {
             replyVO.setUserType(userMap.get(replyVO.getUserId()).getType());
-            if (!replyVO.getAnonymity()||isAdmin) {
+            if (!replyVO.getAnonymity() || isAdmin) {
                 replyVO.setUserName(userMap.get(replyVO.getUserId()).getName());
                 replyVO.setUserIcon(userMap.get(replyVO.getUserId()).getIcon());
             }
@@ -104,10 +111,10 @@ public class InteractionReplyServiceImpl extends ServiceImpl<InteractionReplyMap
 
     }
 
-    private PageDTO<ReplyVO> handleAnswer(ReplyPageQuery replyPageQuery,boolean isAdmin) {
+    private PageDTO<ReplyVO> handleAnswer(ReplyPageQuery replyPageQuery, boolean isAdmin) {
         //分页条件构造
         Page<InteractionReply> page = this.lambdaQuery().eq(InteractionReply::getAnswerId, replyPageQuery.getAnswerId())
-                .eq(!isAdmin,InteractionReply::getHidden, false)
+                .eq(!isAdmin, InteractionReply::getHidden, false)
                 .page(replyPageQuery.toMpPageDefaultSortByCreateTimeDesc());
         List<InteractionReply> records = page.getRecords();
         //非空判断
@@ -116,9 +123,9 @@ public class InteractionReplyServiceImpl extends ServiceImpl<InteractionReplyMap
         }
         //获取用户信息
         Set<Long> ids = new HashSet<>();
-        for(InteractionReply r : records){
+        for (InteractionReply r : records) {
             ids.add(r.getUserId());
-            if(r.getTargetUserId()!=null){
+            if (r.getTargetUserId() != null) {
                 ids.add(r.getTargetUserId());
             }
         }
@@ -126,14 +133,14 @@ public class InteractionReplyServiceImpl extends ServiceImpl<InteractionReplyMap
         Map<Long, UserDTO> userMap = userDTOS.stream().collect(Collectors.toMap(UserDTO::getId, u -> u));
         //po->vo
         List<ReplyVO> result = new ArrayList<>();
-        for(InteractionReply reply : records){
+        for (InteractionReply reply : records) {
             ReplyVO replyVO = BeanUtils.copyBean(reply, ReplyVO.class);
-            if(!replyVO.getAnonymity()||isAdmin){
+            if (!replyVO.getAnonymity() || isAdmin) {
                 replyVO.setUserIcon(userMap.get(reply.getUserId()).getIcon());
                 replyVO.setUserName(userMap.get(reply.getUserId()).getName());
             }
             replyVO.setUserType(userMap.get(reply.getUserId()).getType());
-            if(reply.getTargetUserId() != null){
+            if (reply.getTargetUserId() != null) {
                 replyVO.setTargetUserName(userMap.get(reply.getTargetUserId()).getName());
             }
             result.add(replyVO);
