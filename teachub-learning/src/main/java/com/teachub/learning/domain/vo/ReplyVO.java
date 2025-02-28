@@ -31,8 +31,8 @@ public class ReplyVO {
     @ApiModelProperty("当前回复者类型，2-学员，其它-老师")
     private Integer userType;
 
-//    @ApiModelProperty("是否点过赞")
-//    private Boolean liked;
+    @ApiModelProperty("是否点过赞")
+    private Boolean liked;
     @ApiModelProperty("点赞数量")
     private Integer likedTimes;
     @ApiModelProperty("目标用户名字")
