@@ -53,8 +53,9 @@ public class LikedRecordServiceImpl extends ServiceImpl<LikedRecordMapper, Liked
             flag = this.save(likedRecord);
         }
         else{
-            flag = this.remove(this.lambdaQuery().eq(LikedRecord::getUserId, userId)
-                    .eq(LikedRecord::getBizId, likeRecordFormDTO.getBizId()));
+            flag = this.lambdaUpdate().eq(LikedRecord::getUserId, userId)
+                    .eq(LikedRecord::getBizId, likeRecordFormDTO.getBizId())
+                    .remove();
         }
         //如果业务处理失败，直接返回
         if(!flag){
@@ -77,6 +78,6 @@ public class LikedRecordServiceImpl extends ServiceImpl<LikedRecordMapper, Liked
         List<LikedRecord> list = this.lambdaQuery().eq(LikedRecord::getUserId, userid)
                 .in(LikedRecord::getBizId, bizIds)
                 .list();
-        return list.stream().map(LikedRecord::getId).collect(Collectors.toSet());
+        return list.stream().map(LikedRecord::getBizId).collect(Collectors.toSet());
     }
 }
