@@ -2,6 +2,8 @@ package com.teachub.learning.mq;
 
 import com.teachub.api.dto.remark.LikedTimesDTO;
 import com.teachub.common.constants.MqConstants;
+import com.teachub.common.exceptions.BizIllegalException;
+import com.teachub.common.utils.CollUtils;
 import com.teachub.learning.domain.po.InteractionReply;
 import com.teachub.learning.service.IInteractionReplyService;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +14,9 @@ import org.springframework.amqp.rabbit.annotation.Queue;
 import org.springframework.amqp.rabbit.annotation.QueueBinding;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Slf4j
 @Component
@@ -24,19 +29,21 @@ public class LikedListener {
                     exchange = @Exchange(name = MqConstants.Exchange.LIKE_RECORD_EXCHANGE, type = ExchangeTypes.TOPIC),
                     key = MqConstants.Key.QA_LIKED_TIMES_KEY
             ))
-    public void LikedTimesListener(LikedTimesDTO likedTimesDTO) {
-        log.info("监听点赞数变化id:{}",likedTimesDTO);
-        if(likedTimesDTO.getIsLiked()){
-            interactionReplyService.lambdaUpdate()
-                    .eq(InteractionReply::getId,likedTimesDTO.getBizId())
-                    .setSql("liked_times=liked_times+1")
-                    .update();
+    public void LikedTimesListener(List<LikedTimesDTO> list) {
+        log.info("监听点赞数变化:{}",list);
+        if(CollUtils.isEmpty(list)){
+            return;
         }
-        else{
-            interactionReplyService.lambdaUpdate()
-                    .eq(InteractionReply::getId,likedTimesDTO.getBizId())
-                    .setSql("liked_times=liked_times-1")
-                    .update();
+        List<InteractionReply> interactionReplies = new ArrayList<>();
+        for(LikedTimesDTO likedTimesDTO : list){
+            InteractionReply interactionReply = new InteractionReply();
+            interactionReply.setId(likedTimesDTO.getBizId());
+            interactionReply.setLikedTimes(likedTimesDTO.getLikedTimes());
+            interactionReplies.add(interactionReply);
+        }
+        boolean update = interactionReplyService.updateBatchById(interactionReplies);
+        if(!update){
+            throw new BizIllegalException("更新点赞失败");
         }
     }
 }
