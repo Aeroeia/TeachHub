@@ -2,8 +2,11 @@ package com.teachub.learning.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.teachub.learning.domain.po.PointsRecord;
+import com.teachub.learning.domain.vo.PointsStatisticsVO;
 import com.teachub.learning.enums.PointsRecordType;
 import com.teachub.learning.mq.msg.SignInMessage;
+
+import java.util.List;
 
 /**
  * <p>
@@ -16,4 +19,7 @@ import com.teachub.learning.mq.msg.SignInMessage;
 public interface IPointsRecordService extends IService<PointsRecord> {
 
     void addPoints(SignInMessage signInMessage, PointsRecordType pointsRecordType);
+
+    List<PointsStatisticsVO> getPointsStatistic();
+
 }
