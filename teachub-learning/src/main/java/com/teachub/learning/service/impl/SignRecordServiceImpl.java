@@ -1,11 +1,14 @@
 package com.teachub.learning.service.impl;
 
+import com.teachub.common.autoconfigure.mq.RabbitMqHelper;
+import com.teachub.common.constants.MqConstants;
 import com.teachub.common.exceptions.BadRequestException;
 import com.teachub.common.exceptions.BizIllegalException;
 import com.teachub.common.utils.CollUtils;
 import com.teachub.common.utils.UserContext;
 import com.teachub.learning.constants.RedisConstant;
 import com.teachub.learning.domain.vo.SignResultVO;
+import com.teachub.learning.mq.msg.SignInMessage;
 import com.teachub.learning.service.ISignRecordService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +25,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SignRecordServiceImpl implements ISignRecordService {
     private final StringRedisTemplate redisTemplate;
+    private final RabbitMqHelper rabbitMqHelper;
 
     @Override
     public SignResultVO addSignRecord() {
@@ -68,6 +72,11 @@ public class SignRecordServiceImpl implements ISignRecordService {
                 break;
             }
         }
-        return new SignResultVO(count,1,rewardPoints);
+        SignResultVO signResultVO = new SignResultVO(count, 1, rewardPoints);
+        //mq异步更新积分记录
+        rabbitMqHelper.send(MqConstants.Exchange.LEARNING_EXCHANGE,
+                MqConstants.Key.SIGN_IN,
+                SignInMessage.of(userId,signResultVO.totalPoints()));
+        return signResultVO;
     }
 }

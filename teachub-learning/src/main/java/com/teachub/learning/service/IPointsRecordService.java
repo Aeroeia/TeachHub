@@ -2,6 +2,8 @@ package com.teachub.learning.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.teachub.learning.domain.po.PointsRecord;
+import com.teachub.learning.enums.PointsRecordType;
+import com.teachub.learning.mq.msg.SignInMessage;
 
 /**
  * <p>
@@ -13,4 +15,5 @@ import com.teachub.learning.domain.po.PointsRecord;
  */
 public interface IPointsRecordService extends IService<PointsRecord> {
 
+    void addPoints(SignInMessage signInMessage, PointsRecordType pointsRecordType);
 }
