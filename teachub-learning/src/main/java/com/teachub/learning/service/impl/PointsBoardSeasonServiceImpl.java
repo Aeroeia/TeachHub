@@ -1,10 +1,14 @@
 package com.teachub.learning.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.teachub.common.utils.BeanUtils;
 import com.teachub.learning.domain.po.PointsBoardSeason;
+import com.teachub.learning.domain.vo.PointsBoardSeasonVO;
 import com.teachub.learning.mapper.PointsBoardSeasonMapper;
 import com.teachub.learning.service.IPointsBoardSeasonService;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 /**
  * <p>
@@ -17,4 +21,9 @@ import org.springframework.stereotype.Service;
 @Service
 public class PointsBoardSeasonServiceImpl extends ServiceImpl<PointsBoardSeasonMapper, PointsBoardSeason> implements IPointsBoardSeasonService {
 
+    @Override
+    public List<PointsBoardSeasonVO> querySeasons() {
+        List<PointsBoardSeason> list = this.list();
+        return BeanUtils.copyList(list, PointsBoardSeasonVO.class);
+    }
 }

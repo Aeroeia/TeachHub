@@ -36,4 +36,13 @@ public class BitMapTest {
         System.out.println(now.format(DateTimeFormatter.ofPattern(":yyyyMM")));
         System.out.println(now.getDayOfMonth());
     }
+    @Test
+    void bitT(){
+        int dayOfMonth = LocalDate.now().getDayOfMonth();
+        Long record = 5L;
+        String replace = String.format("%" + dayOfMonth + "s", Long.toBinaryString(record)).replace(' ', '0');
+        System.out.println(replace);
+        System.out.println(replace.length());
+
+    }
 }
