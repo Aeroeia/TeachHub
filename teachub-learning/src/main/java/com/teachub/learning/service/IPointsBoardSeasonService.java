@@ -17,4 +17,6 @@ import java.util.List;
 public interface IPointsBoardSeasonService extends IService<PointsBoardSeason> {
 
     List<PointsBoardSeasonVO> querySeasons();
+
+    void createSeasonTable(Integer id);
 }
