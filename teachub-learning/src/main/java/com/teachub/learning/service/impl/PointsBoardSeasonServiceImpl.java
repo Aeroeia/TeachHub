@@ -21,13 +21,13 @@ import java.util.List;
  */
 @Service
 public class PointsBoardSeasonServiceImpl extends ServiceImpl<PointsBoardSeasonMapper, PointsBoardSeason> implements IPointsBoardSeasonService {
-
+    //查询赛季名
     @Override
     public List<PointsBoardSeasonVO> querySeasons() {
         List<PointsBoardSeason> list = this.list();
         return BeanUtils.copyList(list, PointsBoardSeasonVO.class);
     }
-
+    //创建赛季表
     @Override
     public void createSeasonTable(Integer id) {
         this.getBaseMapper().createTable(LearningConstants.POINTS_BOARD_TABLE_PREFIX+id);

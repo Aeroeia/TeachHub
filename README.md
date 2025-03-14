@@ -1,7 +1,10 @@
 # TeachHub
 ## 整体架构
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tianji-system.jpg)
-## 我的课表模块开发 
+- 点赞 zset set
+- xxl-job配置使用
+- Interceptor顺序
+## 一、我的课表模块开发 
 >Tips:在分布式系统中，使用数据库自增ID容易造成性能瓶颈和ID冲突，因为多个节点同时生成ID需要依赖数据库集中控制。而雪花算法（Snowflake）能在不同节点上本地高效、唯一地生成ID，避免分布式锁和数据库竞争问题，具有高可用、无中心、趋势递增等优点。因此，分布式系统推荐采用雪花算法而非默认的自增ID
 ---
 ### 业务流程分析
@@ -66,7 +69,7 @@ public MessageRecoverer republishMessageRecoverer(RabbitTemplate rabbitTemplate)
 ```
 当然了出现这个问题主要还是我在本地只启动了这一个微服务(其他服务跑在服务器上)，导致错误消息队列中消息没被消费，我使用try catch后确实把错误消息打印出来了，记录一下这个小小发现叭~
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/0ab6c810-0904-404b-a704-0620ea2855c3.png)
-## 学习计划和进度模块开发
+## 二、学习计划和进度模块开发
 ### 业务流程分析
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/a1.png)
 #### 接口设计
@@ -124,18 +127,15 @@ public class LearningRecordServiceImpl extends ServiceImpl<LearningRecordMapper,
 private  ILearningRecordService learningRecordService;
 ```
 2. 注入Mapper
-## 高并发优化
+## 三、高并发优化
 ### 流程分析
 播放进度记录业务较为复杂，但是我们认真思考一下整个业务分支：
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/learning.png)
 - 考试：每章只能考一次，还不能重复考试。因此属于低频行为，可以忽略
 - 视频进度：前端每隔15秒就提交一次请求。在一个视频播放的过程中，可能有数十次请求，但完播（进度超50%）的请求只会有一次。因此多数情况下都是更新一下播放进度即可。
-
 也就是说，95%的请求都是在更新`learning_record`表中的`moment`字段，以及`learning_lesson`表中的正在学习的小节id和时间。  
-
 而播放进度信息，不管更新多少次，下一次续播肯定是从最后的一次播放进度开始续播。也就是说我们只需要记住最后一次即可。因此可以采用合并写方案来降低数据库写的次数和频率，而异步写做不到。  
 综上，提交播放进度业务虽然看起来复杂，但大多数请求的处理很简单，就是更新播放进度。并且播放进度数据是可以合并的（覆盖之前旧数据）。我们建议采用合并写请求方案：
-
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/redis.png)
 ---
 ### Redis数据结构设计
@@ -189,7 +189,126 @@ private  ILearningRecordService learningRecordService;
 
 **流程如下**
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/op.png)
-## 问答系统开发
+#### 延迟队列配置
+**DelayTask**
+```java
+@Data
+public class DelayTask<D> implements Delayed {
+    private D data;
+    private long deadlineNanos;
+
+    public DelayTask(D data, Duration delayTime) {
+        this.data = data;
+        this.deadlineNanos = System.nanoTime() + delayTime.toNanos();
+    }
+
+    @Override
+    public long getDelay(TimeUnit unit) {
+        return unit.convert(Math.max(0, deadlineNanos - System.nanoTime()), TimeUnit.NANOSECONDS);
+    }
+
+    @Override
+    public int compareTo(Delayed o) {
+        long l = getDelay(TimeUnit.NANOSECONDS) - o.getDelay(TimeUnit.NANOSECONDS);
+        if(l > 0){
+            return 1;
+        }else if(l < 0){
+            return -1;
+        }else {
+            return 0;
+        }
+    }
+}
+```
+**延迟队列**
+```java
+private final DelayQueue<DelayTask<RecordTaskData>> queue = new DelayQueue<>();
+@Data
+    @NoArgsConstructor
+    private static class RecordCacheData {
+        private Long id;
+        private Integer moment;
+        private Boolean finished;
+
+        public RecordCacheData(LearningRecord record) {
+            this.id = record.getId();
+            this.moment = record.getMoment();
+            this.finished = record.getFinished();
+        }
+    }
+
+    @Data
+    @NoArgsConstructor
+    private static class RecordTaskData {
+        private Long lessonId;
+        private Long sectionId;
+        private Integer moment;
+
+        public RecordTaskData(LearningRecord record) {
+            this.lessonId = record.getLessonId();
+            this.sectionId = record.getSectionId();
+            this.moment = record.getMoment();
+        }
+    }
+```
+#### 多线程优化
+**线程池配置**
+```java
+static ThreadPoolExecutor poolExecutor = new ThreadPoolExecutor(
+        5,
+        16,
+        60,
+        TimeUnit.SECONDS,
+        new LinkedBlockingDeque<>(10)
+);
+```
+**多线程获取延迟队列任务**
+```java
+private void handleDelayTask() {
+
+    while(begin){
+        try {
+            // 1.尝试获取任务
+            log.info("尝试获取任务");
+            DelayTask<RecordTaskData> task = queue.take();
+            log.debug("获取到要处理的播放记录任务");
+            poolExecutor.submit(new Runnable() {
+                @Override
+                public void run() {
+                    // 2.读取Redis缓存
+                    RecordTaskData data = task.getData();
+                    LearningRecord record = readRecordCache(data.getLessonId(), data.getSectionId());
+                    if(record==null){
+                        return;
+                    }
+                    // 3.比较数据
+                    if (!Objects.equals(data.getMoment(), record.getMoment())) {
+                        // 4.如果不一致，播放进度在变化，无需持久化
+                        return;
+                    }
+                    // 5.如果一致，证明用户离开了视频，需要持久化
+                    // 5.1.更新学习记录
+                    record.setFinished(null);
+                    recordMapper.updateById(record);
+                    // 5.2.更新课表
+                    LearningLesson lesson = new LearningLesson();
+                    lesson.setId(data.getLessonId());
+                    lesson.setLatestSectionId(data.getSectionId());
+                    lesson.setLatestLearnTime(LocalDateTime.now());
+                    lessonService.updateById(lesson);
+
+                    log.debug("准备持久化学习记录信息");
+                }
+            });
+
+        } catch (Exception e) {
+            log.error("处理播放记录任务发生异常", e);
+        }
+    }
+
+}
+```
+## 四、问答系统开发
 ### 产品原型
 #### 1.课程详情页
 在用户已经登录的情况下，如果用户购买了课程，在课程详情页可以看到一个互动问答的选项卡：
@@ -310,7 +429,59 @@ private  ILearningRecordService learningRecordService;
 #### 2..回答、评论的ER图
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/whiteboard_exported_image-2.png)
 
-### 三级缓存
+### 管理端分页查询问题
+#### Es使用
+**ip配置**
+**引入依赖**
+```xml
+<properties>
+  <elasticsearch.version>7.12.1</elasticsearch.version>
+<properties>
+
+<dependency>
+    <groupId>org.elasticsearch.client</groupId>
+    <artifactId>elasticsearch-rest-high-level-client</artifactId>
+</dependency>
+```
+```yaml
+elasticsearch:
+  uris: http://192.168.150.101:9200
+```
+**根据课程名查询课程id**
+```java
+@Autowired
+private RestHighLevelClient restClient;
+
+@Override
+public List<Long> queryCoursesIdByName(String keyword) {
+    // 1.创建Request
+    SearchRequest request = new SearchRequest(CourseRepository.INDEX_NAME);
+    // 2.构建DSL
+    request.source()
+            .query(QueryBuilders.matchPhraseQuery(CourseRepository.DEFAULT_QUERY_NAME, keyword))
+            .fetchSource(new String[]{"id"}, null);
+    // 3.查询
+    SearchResponse response;
+    try {
+        response = restClient.search(request, RequestOptions.DEFAULT);
+    } catch (IOException e) {
+        throw new CommonException(SearchErrorInfo.QUERY_COURSE_ERROR, e);
+    }
+    // 4.解析
+    SearchHits searchHits = response.getHits();
+    // 4.1.获取hits
+    SearchHit[] hits = searchHits.getHits();
+    if (hits.length == 0) {
+        return CollUtils.emptyList();
+    }
+    // 4.2.获取id
+    return Arrays.stream(hits)
+            .map(SearchHit::getId)
+            .map(Long::valueOf)
+            .collect(Collectors.toList());
+}
+```
+#### 三级缓存
 在管理端分页查询问题的时候，需要查询课程的分类信息，而课程的分类有三级
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/cata.png)
 每一个课程都与第三级分类关联，因此向上级追溯，也有对应的二级、一级分类。在课程微服务提供的查询课程的接口中，可以看到返回的课程信息中就包含了关联的一级、二级、三级分类。因此，只要我们查询到了问题所属的课程，就能知道课程关联的三级分类id。  
@@ -321,17 +492,70 @@ private  ILearningRecordService learningRecordService;
 - 本地缓存不存在，再查询Redis缓存
 - Redis不存在，再去查询数据库。
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/whiteboard_exported_image.png)
-## 点赞系统
+#### Caffeine
+**配置**
+```java
+@Configuration
+public class CategoryCacheConfig {
+    /**
+     * 课程分类的caffeine缓存
+     */
+    @Bean
+    public Cache<String, Map<Long, CategoryBasicDTO>> categoryCaches(){
+        return Caffeine.newBuilder()
+                .initialCapacity(1) // 容量限制
+                .maximumSize(10_000) // 最大内存限制
+                .expireAfterWrite(Duration.ofMinutes(30)) // 有效期
+                .build();
+    }
+    /**
+     * 课程分类的缓存工具类
+     */
+    @Bean
+    public CategoryCache categoryCache(
+            Cache<String, Map<Long, CategoryBasicDTO>> categoryCaches, CategoryClient categoryClient){
+        return new CategoryCache(categoryCaches, categoryClient);
+    }
+}
+```
+**缓存结果**
+```java
+    public Map<Long, CategoryBasicDTO> getCategoryMap() {
+        return categoryCaches.get(Constant.CAFFEINE_CACHE_NAME, key -> {
+            // 1.从CategoryClient查询
+            List<CategoryBasicDTO> list = categoryClient.getAllOfOneLevel();
+            if (list == null || list.isEmpty()) {
+                return CollUtils.emptyMap();
+            }
+            // 2.转换数据
+            return list.stream().collect(Collectors.toMap(CategoryBasicDTO::getId, Function.identity()));
+        });
+    }
+
+    public String getCategoryNames(List<Long> ids) {
+        if (ids == null || ids.size() == 0) {
+            return "";
+        }
+        // 1.读取分类缓存
+        Map<Long, CategoryBasicDTO> map = getCategoryMap();
+        // 2.根据id查询分类名称并组装
+        StringBuilder sb = new StringBuilder();
+        for (Long id : ids) {
+            sb.append(map.get(id).getName()).append("/");
+        }
+        // 3.返回结果
+        return sb.deleteCharAt(sb.length() - 1).toString();
+    }
+```
+## 五、点赞系统
 ### 业务流程
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-remark/whiteboard_exported_image.png)
 该业务可以采用以下思路进行实现:
 1. 用户点赞后查询Redis是否存在该用户点赞记录(set)，若存在则直接返回，不存在则在redis新增点赞记录(zset)，采用定时任务，定期将数据通过mq发送到对应业务微服务更新点赞数量，同时清除zset中的数据  
 2. 查询用户是否点赞远程微服务通过feign接口调用remark服务，使用redis管道连接功能提高遍历效率
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-remark/redisopt.png)
----
 ### ER图
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-remark/whiteboard_exported_image-2.png)
----
 ### Mq问题
 我在调试用户点赞后更新远程微服务点赞数量的时候出现了以下报错
 ```
@@ -401,10 +625,9 @@ x-original-routingKey:	QA.times.changed
 调试的时候我发现一个很奇异的现象：发送MQ请求无法更新点赞数量，但是偶然又能成功更新数据库，让我百思不得其解  
 起初我查看error消息队列有新增异常的时候返回来看idea控制台learning服务并没有打印任何东西，我以为类型转换错误不会打印消息会直接走`MessageRecoverer`，思来想去半个多小时突然想到**MQ好像不依赖nacos**，所以出现这个问题的原因是我本地写的代码没有推送到服务器上更新服务器上的服务，**即使我在nacos让服务下线，但该服务的MQ还是能正常进行消费**，这也解释了为什么前面偶然能成功更新而有时候又不行，是因为部分走了服务器上的消费者而部分走了本地服务  
 *我还一直以为是我序列化有问题🤦 记录一下这半个多小时的折腾吧哈哈*
-## 积分系统
+## 六、积分系统
 ### 接口设计
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day07/1.png)
----
 ### 数据库ER图
 #### 签到记录
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day07/whiteboard_exported_image.png)
@@ -412,7 +635,6 @@ x-original-routingKey:	QA.times.changed
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day07/whiteboard_exported_image-2.png)
 #### 排行榜
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day07/whiteboard_exported_image-3.png)
----
 ### 签到功能实现--BitMap
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day07/sign.png)
 我们知道二进制是计算机底层最基础的存储方式了，其中的每一位数字就是计算机信息量的最小单位了，称之为bit，一个月最多也就 31 天，因此一个月的签到记录最多也就使用 31 bit 就能保存了，还不到 4 个字节。
@@ -462,5 +684,11 @@ BitMap也不例外，它是基于String结构的。因为Redis的String类型底
 
 **该业务我们使用MQ进行解耦**
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day07/whiteboard_exported_image-4.png)
-## 排行榜
-### 分区分表
+## 七、排行榜
+这个模块主要涉及两个功能的实现
+1. 实时排行榜
+实时榜需要快速获得
+2. 历史排行榜
+
+
+###  实时排行榜

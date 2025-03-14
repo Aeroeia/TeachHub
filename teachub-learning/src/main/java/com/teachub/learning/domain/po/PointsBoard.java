@@ -1,6 +1,7 @@
 package com.teachub.learning.domain.po;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import io.swagger.annotations.ApiModel;
@@ -39,6 +40,7 @@ public class PointsBoard implements Serializable {
     private Integer points;
 
     @ApiModelProperty(value = "名次，只记录赛季前100")
+    @TableField("'rank'") //rank在数据库中是关键字
     private Integer rank;
 
     @ApiModelProperty(value = "赛季，例如 1,就是第一赛季，2-就是第二赛季")

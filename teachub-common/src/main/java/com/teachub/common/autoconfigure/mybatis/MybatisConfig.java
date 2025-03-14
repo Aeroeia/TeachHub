@@ -4,7 +4,11 @@ package com.teachub.common.autoconfigure.mybatis;
 import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
+import com.baomidou.mybatisplus.extension.plugins.inner.DynamicTableNameInnerInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
+import com.teachub.common.autoconfigure.mybatis.BaseMetaObjectHandler;
+import com.teachub.common.autoconfigure.mybatis.MyBatisAutoFillInterceptor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
@@ -26,12 +30,19 @@ public class MybatisConfig {
 
     @Bean
     @ConditionalOnMissingBean
-    public MybatisPlusInterceptor mybatisPlusInterceptor() {
+    public MybatisPlusInterceptor mybatisPlusInterceptor(@Autowired(required = false)DynamicTableNameInnerInterceptor dynamicTableNameInnerInterceptor) {
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
+        //动态表名
+        if(dynamicTableNameInnerInterceptor!=null){
+            interceptor.addInnerInterceptor(dynamicTableNameInnerInterceptor);
+        }
+        //分页插件
         PaginationInnerInterceptor paginationInnerInterceptor = new PaginationInnerInterceptor(DbType.MYSQL);
         paginationInnerInterceptor.setMaxLimit(200L);
         interceptor.addInnerInterceptor(paginationInnerInterceptor);
+        //自动填充用户id
         interceptor.addInnerInterceptor(new MyBatisAutoFillInterceptor());
+
         return interceptor;
     }
 }
