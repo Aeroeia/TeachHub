@@ -1,6 +1,7 @@
 package com.teachub.learning.service.impl;
 
 import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.teachub.api.client.user.UserClient;
 import com.teachub.api.dto.user.UserDTO;
@@ -8,6 +9,7 @@ import com.teachub.common.exceptions.BadRequestException;
 import com.teachub.common.exceptions.BizIllegalException;
 import com.teachub.common.utils.CollUtils;
 import com.teachub.common.utils.UserContext;
+import com.teachub.learning.constants.LearningConstants;
 import com.teachub.learning.constants.RedisConstant;
 import com.teachub.learning.domain.dto.PointsBoardQuery;
 import com.teachub.learning.domain.po.PointsBoard;
@@ -15,6 +17,7 @@ import com.teachub.learning.domain.vo.PointsBoardItemVO;
 import com.teachub.learning.domain.vo.PointsBoardVO;
 import com.teachub.learning.mapper.PointsBoardMapper;
 import com.teachub.learning.service.IPointsBoardService;
+import com.teachub.learning.utils.TableInfoContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
@@ -43,6 +46,7 @@ public class PointsBoardServiceImpl extends ServiceImpl<PointsBoardMapper, Point
 
     private final UserClient userClient;
 
+
     //查询积分排行榜
     @Override
     public PointsBoardVO queryPointsBoard(PointsBoardQuery pointsBoardQuery) {
@@ -54,7 +58,7 @@ public class PointsBoardServiceImpl extends ServiceImpl<PointsBoardMapper, Point
         boolean isCurrent = pointsBoardQuery.getSeason() == null || pointsBoardQuery.getSeason() == 0;
         String format = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
         String key = RedisConstant.POINTS_BOARD_KEY_PREFIX + format;
-        //查询当前排名
+        //查询排名
         Long season = pointsBoardQuery.getSeason();
         PointsBoard myRank = isCurrent ? queryMyCurrentBoard(key) : queryMyHistoryBoard(season);
         //分页查询榜单
@@ -63,7 +67,7 @@ public class PointsBoardServiceImpl extends ServiceImpl<PointsBoardMapper, Point
         List<PointsBoard> boardList = isCurrent ? queryBoardList(key, pageSize, pageNo) : queryHistoryBoardList(pointsBoardQuery);
         //封装数据
         PointsBoardVO pointsBoardVO = new PointsBoardVO();
-        pointsBoardVO.setRank(myRank.getRank());
+        pointsBoardVO.setRank(myRank.getId().intValue());
         pointsBoardVO.setPoints(myRank.getPoints());
         //远程调用userService查询用户名
         List<Long> userIds = boardList.stream().map(PointsBoard::getUserId).collect(Collectors.toList());
@@ -77,7 +81,7 @@ public class PointsBoardServiceImpl extends ServiceImpl<PointsBoardMapper, Point
         for(PointsBoard board : boardList){
             PointsBoardItemVO pointsBoardItemVO = new PointsBoardItemVO();
             pointsBoardItemVO.setName(userMap.get(board.getUserId()));
-            pointsBoardItemVO.setRank(board.getRank());
+            pointsBoardItemVO.setRank(board.getId());
             pointsBoardItemVO.setPoints(board.getPoints());
             list.add(pointsBoardItemVO);
         }
@@ -99,7 +103,7 @@ public class PointsBoardServiceImpl extends ServiceImpl<PointsBoardMapper, Point
         //遍历结果
         for (var tuple : list) {
             PointsBoard board = new PointsBoard();
-            board.setRank(++rank);
+            board.setId(++rank);
             String userId = tuple.getValue();
             Double score = tuple.getScore();
             if (StrUtil.isBlank(userId) || score == null) {
@@ -114,7 +118,13 @@ public class PointsBoardServiceImpl extends ServiceImpl<PointsBoardMapper, Point
 
     //TODO 分页查询历史榜单
     private List<PointsBoard> queryHistoryBoardList(PointsBoardQuery pointsBoardQuery) {
-        return null;
+        Page<PointsBoard> page = this.lambdaQuery()
+                .page(pointsBoardQuery.toMpPageDefaultSortByCreateTimeDesc());
+        List<PointsBoard> list = page.getRecords();
+        if(CollUtils.isEmpty(list)){
+            return List.of();
+        }
+        return list;
     }
 
 
@@ -127,13 +137,18 @@ public class PointsBoardServiceImpl extends ServiceImpl<PointsBoardMapper, Point
         //赋值
         PointsBoard pointsBoard = new PointsBoard();
         pointsBoard.setPoints(score == null ? 0 : score.intValue())
-                .setRank(rank == null ? 0 : rank.intValue() + 1);
+                .setId(rank == null ? 0 : rank.intValue() + 1);
         return pointsBoard;
     }
 
     //TODO 查询我的历史排行
     private PointsBoard queryMyHistoryBoard(Long season) {
-        return null;
+        Long userId = UserContext.getUser();
+        //动态设置表名
+        TableInfoContext.setInfo(LearningConstants.POINTS_BOARD_TABLE_PREFIX+season);
+        return this.lambdaQuery()
+                .eq(PointsBoard::getUserId, userId)
+                .one();
     }
 
 

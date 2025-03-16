@@ -1,16 +1,15 @@
 package com.teachub.learning.domain.po;
 
-import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import java.io.Serializable;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
-
-import java.io.Serializable;
 
 /**
  * <p>
@@ -29,9 +28,9 @@ public class PointsBoard implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    @ApiModelProperty(value = "榜单id")
-    @TableId(value = "id", type = IdType.ASSIGN_ID)
-    private Long id;
+    @ApiModelProperty(value = "排名")
+    @TableId(value = "id", type = IdType.INPUT)
+    private Integer id;
 
     @ApiModelProperty(value = "学生id")
     private Long userId;
@@ -39,12 +38,6 @@ public class PointsBoard implements Serializable {
     @ApiModelProperty(value = "积分值")
     private Integer points;
 
-    @ApiModelProperty(value = "名次，只记录赛季前100")
-    @TableField("'rank'") //rank在数据库中是关键字
-    private Integer rank;
-
-    @ApiModelProperty(value = "赛季，例如 1,就是第一赛季，2-就是第二赛季")
-    private Integer season;
 
 
 }

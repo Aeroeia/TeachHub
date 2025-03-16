@@ -28,7 +28,7 @@ public class PointsBoardTask {
     private final StringRedisTemplate redisTemplate;
     @XxlJob("createTableJob")
     public void createPointBoardTable(){
-        log.info("将上赛季数据写入数据库");
+        log.info("创建数据库表");
         //查询上赛季id
         LocalDate lastMonth = LocalDate.now().minusMonths(1);
         PointsBoardSeason season = pointsBoardSeasonService.lambdaQuery()
@@ -64,25 +64,21 @@ public class PointsBoardTask {
         //分页查询redis减缓压力
         //通过集群xxl-job分片加快持久化速度
         int shardTotal = XxlJobHelper.getShardTotal();
-        int pageNo = XxlJobHelper.getShardIndex();
+        int pageNo = XxlJobHelper.getShardIndex()+1;
         int pageSize = 1000;
         while(true){
             List<PointsBoard> pointsBoards = pointsBoardService.queryBoardList(format, pageSize, pageNo);
+            log.info("分页查询结果为:{},pageNo:{}",pointsBoards,pageNo);
             if(CollUtils.isEmpty(pointsBoards)){
                 break;
             }
-            //将rank转移到id后db批量新增
-            for(PointsBoard pointsBoard : pointsBoards){
-                pointsBoard.setId(pointsBoard.getRank().longValue());
-                pointsBoard.setRank(null);
-            }
-            log.info("数据:{}",pointsBoards);
             pointsBoardService.saveBatch(pointsBoards);
             pageNo+=shardTotal;
         }
         //清空ThreadLocal
         TableInfoContext.remove();
     }
+
     //清空redis缓存
     @XxlJob("clearPointsBoardFromRedis")
     public void clearPointsBoardFromRedis(){
