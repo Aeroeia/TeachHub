@@ -9,7 +9,7 @@
         <version>1.0.0</version>
     </parent>
 
-    <artifactId>teachub-remark</artifactId>
+    <artifactId>teachub-promotion</artifactId>
 
     <properties>
         <maven.compiler.source>11</maven.compiler.source>
@@ -97,9 +97,10 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <mainClass>com.tianji.remark.RemarkApplication</mainClass>
+                    <mainClass>com.teachub.learning.LearningApplication</mainClass>
                 </configuration>
             </plugin>
         </plugins>
     </build>
+
 </project>
