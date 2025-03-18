@@ -1,6 +1,7 @@
 package com.teachub.promotion.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.teachub.promotion.domain.po.Coupon;
 import com.teachub.promotion.domain.po.ExchangeCode;
 
 /**
@@ -13,4 +14,5 @@ import com.teachub.promotion.domain.po.ExchangeCode;
  */
 public interface IExchangeCodeService extends IService<ExchangeCode> {
 
+    void asyncCreateCode(Coupon one);
 }
