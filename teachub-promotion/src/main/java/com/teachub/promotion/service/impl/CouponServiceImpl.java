@@ -4,14 +4,17 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.teachub.common.domain.dto.PageDTO;
 import com.teachub.common.exceptions.BadRequestException;
+import com.teachub.common.exceptions.BizIllegalException;
 import com.teachub.common.utils.BeanUtils;
 import com.teachub.common.utils.CollUtils;
 import com.teachub.common.utils.StringUtils;
 import com.teachub.promotion.domain.dto.CouponFormDTO;
+import com.teachub.promotion.domain.dto.CouponIssueFormDTO;
 import com.teachub.promotion.domain.dto.CouponQuery;
 import com.teachub.promotion.domain.po.Coupon;
 import com.teachub.promotion.domain.po.CouponScope;
 import com.teachub.promotion.domain.vo.CouponPageVO;
+import com.teachub.promotion.enums.CouponStatus;
 import com.teachub.promotion.mapper.CouponMapper;
 import com.teachub.promotion.service.ICouponScopeService;
 import com.teachub.promotion.service.ICouponService;
@@ -19,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -79,5 +83,34 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
         }
         List<CouponPageVO> couponPageVOS = BeanUtils.copyList(records, CouponPageVO.class);
         return PageDTO.of(page,couponPageVOS);
+    }
+
+    @Override
+    public void issueCoupon(Long id, CouponIssueFormDTO couponIssueFormDTO) {
+        //查询优惠券
+        Coupon one = this.lambdaQuery()
+                .eq(Coupon::getId, id)
+                .one();
+        if (one == null) {
+            throw new BizIllegalException("优惠券不存在");
+        }
+        //校验优惠券状态
+        if (!one.getStatus().equals(CouponStatus.DRAFT) && one.getStatus().equals(CouponStatus.PAUSE)) {
+            throw new BizIllegalException("优惠券状态异常");
+        }
+        //判断是否立即发放
+        LocalDateTime now = LocalDateTime.now();
+        boolean isStartIssue = couponIssueFormDTO.getIssueBeginTime() == null || !couponIssueFormDTO.getIssueEndTime().isAfter(now);
+        Coupon coupon = BeanUtils.copyBean(couponIssueFormDTO, Coupon.class);
+        if(isStartIssue){
+            coupon.setStatus(CouponStatus.ISSUING);
+            coupon.setIssueBeginTime(now);
+        }
+        else{
+            coupon.setStatus(CouponStatus.UN_ISSUE);
+        }
+        this.updateById(coupon);
+
+        //TODO 如果兑换方式是指定发放 要生成兑换码
     }
 }

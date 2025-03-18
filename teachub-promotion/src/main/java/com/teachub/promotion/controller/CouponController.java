@@ -2,7 +2,9 @@ package com.teachub.promotion.controller;
 
 
 import com.teachub.common.domain.dto.PageDTO;
+import com.teachub.common.exceptions.BadRequestException;
 import com.teachub.promotion.domain.dto.CouponFormDTO;
+import com.teachub.promotion.domain.dto.CouponIssueFormDTO;
 import com.teachub.promotion.domain.dto.CouponQuery;
 import com.teachub.promotion.domain.vo.CouponPageVO;
 import com.teachub.promotion.service.ICouponService;
@@ -41,5 +43,14 @@ public class CouponController {
     public PageDTO<CouponPageVO> queryCouponPage(CouponQuery query) {
         log.info("分页查询优惠券：{}", query);
         return couponService.queryCouponPage(query);
+    }
+    @PutMapping("/{id}/issue")
+    @ApiOperation("发放优惠券")
+    public void issueCoupon(@PathVariable Long id,@Validated @RequestBody CouponIssueFormDTO couponIssueFormDTO) {
+        log.info("发放优惠券：{}", id);
+        if(id==null){
+            throw new BadRequestException("优惠券id为空");
+        }
+        couponService.issueCoupon(id,couponIssueFormDTO);
     }
 }
