@@ -8,7 +8,9 @@ import com.teachub.promotion.mapper.ExchangeCodeMapper;
 import com.teachub.promotion.service.IExchangeCodeService;
 import com.teachub.promotion.utils.CodeUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -26,12 +28,15 @@ import static com.teachub.promotion.constants.PromotionConstants.COUPON_RANGE_KE
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ExchangeCodeServiceImpl extends ServiceImpl<ExchangeCodeMapper, ExchangeCode> implements IExchangeCodeService {
     private final StringRedisTemplate redisTemplate;
 
     //异步生成兑换码
+    @Async("generateExchangeCodeExecutor")
     @Override
     public void asyncCreateCode(Coupon one) {
+        log.info("异步生成兑换码，线程名为:{}",Thread.currentThread().getName());
         //优惠券最大值
         Integer totalNum = one.getTotalNum();
         //新增值到redis
@@ -48,7 +53,7 @@ public class ExchangeCodeServiceImpl extends ServiceImpl<ExchangeCodeMapper, Exc
             ExchangeCode exchangeCode = new ExchangeCode();
             exchangeCode.setCode(code)
                     .setExchangeTargetId(one.getId())
-                    .setExpiredTime(one.getTermEndTime())
+                    .setExpiredTime(one.getIssueEndTime())
                     .setId(i);
             list.add(exchangeCode);
         }
