@@ -6,6 +6,7 @@ import com.teachub.promotion.domain.dto.CouponFormDTO;
 import com.teachub.promotion.domain.dto.CouponIssueFormDTO;
 import com.teachub.promotion.domain.dto.CouponQuery;
 import com.teachub.promotion.domain.po.Coupon;
+import com.teachub.promotion.domain.vo.CouponDetailVO;
 import com.teachub.promotion.domain.vo.CouponPageVO;
 
 /**
@@ -23,4 +24,8 @@ public interface ICouponService extends IService<Coupon> {
     PageDTO<CouponPageVO> queryCouponPage(CouponQuery query);
 
     void issueCoupon(Long id, CouponIssueFormDTO couponIssueFormDTO);
+
+    void updateCoupon(CouponFormDTO coupon, Long id);
+
+    CouponDetailVO queryCouponDetail(Long id);
 }

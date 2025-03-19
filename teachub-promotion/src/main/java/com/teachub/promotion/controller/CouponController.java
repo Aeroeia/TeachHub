@@ -6,6 +6,7 @@ import com.teachub.common.exceptions.BadRequestException;
 import com.teachub.promotion.domain.dto.CouponFormDTO;
 import com.teachub.promotion.domain.dto.CouponIssueFormDTO;
 import com.teachub.promotion.domain.dto.CouponQuery;
+import com.teachub.promotion.domain.vo.CouponDetailVO;
 import com.teachub.promotion.domain.vo.CouponPageVO;
 import com.teachub.promotion.service.ICouponService;
 import io.swagger.annotations.Api;
@@ -33,13 +34,19 @@ import javax.validation.constraints.NotNull;
 public class CouponController {
     private final ICouponService couponService;
     @PostMapping
-    @ApiOperation("新增优惠券")
+    @ApiOperation("新增优惠券-管理端")
     public void addCoupon(@RequestBody @Validated CouponFormDTO coupon) {
         log.info("新增优惠券：{}", coupon);
         couponService.addCoupon(coupon);
     }
+    @PutMapping("/{id}")
+    @ApiOperation("更新优惠券-管理端")
+    public void updateCoupon(@RequestBody CouponFormDTO coupon,@PathVariable Long id){
+        log.info("更新优惠券：{}", coupon);
+        couponService.updateCoupon(coupon,id);
+    }
     @GetMapping("/page")
-    @ApiOperation("分页查询优惠券")
+    @ApiOperation("分页查询优惠券-管理端")
     public PageDTO<CouponPageVO> queryCouponPage(CouponQuery query) {
         log.info("分页查询优惠券：{}", query);
         return couponService.queryCouponPage(query);
@@ -52,5 +59,11 @@ public class CouponController {
             throw new BadRequestException("优惠券id为空");
         }
         couponService.issueCoupon(id,couponIssueFormDTO);
+    }
+    @GetMapping("/{id}")
+    @ApiOperation("查询优惠券详情")
+    public CouponDetailVO queryCouponDetail(@PathVariable Long id) {
+        log.info("查询优惠券详情：{}", id);
+        return couponService.queryCouponDetail(id);
     }
 }

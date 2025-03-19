@@ -1,8 +1,9 @@
 package com.teachub.promotion.service.impl;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.teachub.api.client.course.CategoryClient;
+import com.teachub.api.dto.course.CategoryBasicDTO;
 import com.teachub.common.domain.dto.PageDTO;
 import com.teachub.common.exceptions.BadRequestException;
 import com.teachub.common.exceptions.BizIllegalException;
@@ -14,7 +15,9 @@ import com.teachub.promotion.domain.dto.CouponIssueFormDTO;
 import com.teachub.promotion.domain.dto.CouponQuery;
 import com.teachub.promotion.domain.po.Coupon;
 import com.teachub.promotion.domain.po.CouponScope;
+import com.teachub.promotion.domain.vo.CouponDetailVO;
 import com.teachub.promotion.domain.vo.CouponPageVO;
+import com.teachub.promotion.domain.vo.CouponScopeVO;
 import com.teachub.promotion.enums.CouponStatus;
 import com.teachub.promotion.enums.ObtainType;
 import com.teachub.promotion.mapper.CouponMapper;
@@ -22,6 +25,7 @@ import com.teachub.promotion.service.ICouponScopeService;
 import com.teachub.promotion.service.ICouponService;
 import com.teachub.promotion.service.IExchangeCodeService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,7 +33,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * <p>
@@ -41,9 +47,12 @@ import java.util.stream.Collectors;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> implements ICouponService {
     private final ICouponScopeService couponScopeService;
     private final IExchangeCodeService codeService;
+    private final CategoryClient categoryClient;
+
     //新增优惠券
     @Transactional
     @Override
@@ -91,6 +100,7 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
 
     @Override
     public void issueCoupon(Long id, CouponIssueFormDTO couponIssueFormDTO) {
+        log.info("当前线程名:{}", Thread.currentThread().getName());
         //查询优惠券
         Coupon one = this.lambdaQuery()
                 .eq(Coupon::getId, id)
@@ -106,19 +116,69 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
         LocalDateTime now = LocalDateTime.now();
         boolean isStartIssue = couponIssueFormDTO.getIssueBeginTime() == null || !couponIssueFormDTO.getIssueEndTime().isAfter(now);
         Coupon coupon = BeanUtils.copyBean(couponIssueFormDTO, Coupon.class);
-        if(isStartIssue){
+        if (isStartIssue) {
             coupon.setStatus(CouponStatus.ISSUING);
             coupon.setIssueBeginTime(now);
-        }
-        else{
+        } else {
             coupon.setStatus(CouponStatus.UN_ISSUE);
         }
         this.updateById(coupon);
 
         //TODO 如果兑换方式是指定发放 要生成兑换码
-        if(one.getObtainWay().equals(ObtainType.ISSUE)&&one.getStatus().equals(CouponStatus.DRAFT)){
-            one.setTermEndTime(coupon.getTermEndTime());
+        if (one.getObtainWay().equals(ObtainType.ISSUE) && one.getStatus().equals(CouponStatus.DRAFT)) {
+            one.setIssueEndTime(coupon.getIssueEndTime());
             codeService.asyncCreateCode(one);
         }
+    }
+
+    //更新优惠券信息
+    @Transactional
+    @Override
+    public void updateCoupon(CouponFormDTO dto, Long id) {
+        Coupon coupon = this.getById(id);
+        if (coupon == null) {
+            throw new BizIllegalException("优惠券不存在");
+        }
+        if (coupon.getStatus() == CouponStatus.ISSUING) {
+            throw new BizIllegalException("优惠券正在发放中，请勿修改");
+        }
+        Coupon po = BeanUtils.copyBean(dto, Coupon.class);
+        this.updateById(po);
+        if (po.getSpecific() != null && po.getSpecific()) {
+            List<Long> scopes = dto.getScopes();
+            List<CouponScope> collect = scopes.stream().map(scopeId -> {
+                CouponScope scope = new CouponScope();
+                scope.setCouponId(po.getId())
+                        .setType(1)
+                        .setBizId(scopeId);
+                return scope;
+            }).collect(Collectors.toList());
+            couponScopeService.saveBatch(collect);
+        }
+    }
+
+    //查看优惠券详情信息
+    @Override
+    public CouponDetailVO queryCouponDetail(Long id) {
+        Coupon coupon = this.getById(id);
+        if (coupon == null) {
+            throw new BizIllegalException("优惠券不存在");
+        }
+        CouponDetailVO couponDetailVO = BeanUtils.copyBean(coupon, CouponDetailVO.class);
+        if (coupon.getSpecific() != null && coupon.getSpecific()) {
+            List<CouponScope> list = couponScopeService.lambdaQuery()
+                    .eq(CouponScope::getCouponId, id)
+                    .list();
+            List<CategoryBasicDTO> allOfOneLevel = categoryClient.getAllOfOneLevel();
+            Map<Long, String> map = allOfOneLevel.stream().collect(Collectors.toMap(CategoryBasicDTO::getId, CategoryBasicDTO::getName));
+            List<CouponScopeVO> scopeVOS = list.stream().map((po) -> {
+                CouponScopeVO scopeVO = new CouponScopeVO();
+                scopeVO.setId(po.getBizId());
+                scopeVO.setName(map.get(po.getBizId()));
+                return scopeVO;
+            }).collect(Collectors.toList());
+            couponDetailVO.setScopes(scopeVOS);
+        }
+        return couponDetailVO;
     }
 }
