@@ -33,37 +33,49 @@ import javax.validation.constraints.NotNull;
 @Slf4j
 public class CouponController {
     private final ICouponService couponService;
+
     @PostMapping
     @ApiOperation("新增优惠券-管理端")
     public void addCoupon(@RequestBody @Validated CouponFormDTO coupon) {
         log.info("新增优惠券：{}", coupon);
         couponService.addCoupon(coupon);
     }
+
     @PutMapping("/{id}")
     @ApiOperation("更新优惠券-管理端")
-    public void updateCoupon(@RequestBody CouponFormDTO coupon,@PathVariable Long id){
+    public void updateCoupon(@RequestBody CouponFormDTO coupon, @PathVariable Long id) {
         log.info("更新优惠券：{}", coupon);
-        couponService.updateCoupon(coupon,id);
+        couponService.updateCoupon(coupon, id);
     }
+
     @GetMapping("/page")
     @ApiOperation("分页查询优惠券-管理端")
     public PageDTO<CouponPageVO> queryCouponPage(CouponQuery query) {
         log.info("分页查询优惠券：{}", query);
         return couponService.queryCouponPage(query);
     }
+
     @PutMapping("/{id}/issue")
     @ApiOperation("发放优惠券")
-    public void issueCoupon(@PathVariable Long id,@Validated @RequestBody CouponIssueFormDTO couponIssueFormDTO) {
+    public void issueCoupon(@PathVariable Long id, @Validated @RequestBody CouponIssueFormDTO couponIssueFormDTO) {
         log.info("发放优惠券：{}", id);
-        if(id==null){
+        if (id == null) {
             throw new BadRequestException("优惠券id为空");
         }
-        couponService.issueCoupon(id,couponIssueFormDTO);
+        couponService.issueCoupon(id, couponIssueFormDTO);
     }
+
     @GetMapping("/{id}")
     @ApiOperation("查询优惠券详情")
     public CouponDetailVO queryCouponDetail(@PathVariable Long id) {
         log.info("查询优惠券详情：{}", id);
         return couponService.queryCouponDetail(id);
+    }
+
+    @DeleteMapping("/{id}")
+    @ApiOperation("删除优惠券")
+    public void deleteCoupon(@PathVariable Long id) {
+        log.info("删除优惠券");
+        couponService.delete(id);
     }
 }

@@ -15,6 +15,7 @@ import com.teachub.promotion.domain.dto.CouponIssueFormDTO;
 import com.teachub.promotion.domain.dto.CouponQuery;
 import com.teachub.promotion.domain.po.Coupon;
 import com.teachub.promotion.domain.po.CouponScope;
+import com.teachub.promotion.domain.po.ExchangeCode;
 import com.teachub.promotion.domain.vo.CouponDetailVO;
 import com.teachub.promotion.domain.vo.CouponPageVO;
 import com.teachub.promotion.domain.vo.CouponScopeVO;
@@ -180,5 +181,16 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
             couponDetailVO.setScopes(scopeVOS);
         }
         return couponDetailVO;
+    }
+    //删除优惠券
+    @Override
+    public void delete(Long id) {
+        this.removeById(id);
+        couponScopeService.lambdaUpdate()
+                .eq(CouponScope::getCouponId,id)
+                .remove();
+        codeService.lambdaUpdate()
+                .eq(ExchangeCode::getExchangeTargetId,id)
+                .remove();
     }
 }
