@@ -1,9 +1,14 @@
 package com.teachub.promotion.service.impl;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.teachub.common.domain.dto.PageDTO;
+import com.teachub.common.utils.CollUtils;
 import com.teachub.promotion.constants.PromotionConstants;
+import com.teachub.promotion.domain.dto.CodeQuery;
 import com.teachub.promotion.domain.po.Coupon;
 import com.teachub.promotion.domain.po.ExchangeCode;
+import com.teachub.promotion.domain.vo.CodeVO;
 import com.teachub.promotion.mapper.ExchangeCodeMapper;
 import com.teachub.promotion.service.IExchangeCodeService;
 import com.teachub.promotion.utils.CodeUtil;
@@ -15,6 +20,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static com.teachub.promotion.constants.PromotionConstants.COUPON_RANGE_KEY;
 
@@ -61,5 +67,25 @@ public class ExchangeCodeServiceImpl extends ServiceImpl<ExchangeCodeMapper, Exc
 
         //存储每个优惠券最大的序列号
         redisTemplate.opsForZSet().add(COUPON_RANGE_KEY, one.getId().toString(), maxNum);
+    }
+    //查询兑换码
+    @Override
+    public PageDTO<CodeVO> queryCodesPage(CodeQuery query) {
+        Page<ExchangeCode> page = this.lambdaQuery()
+                .eq(ExchangeCode::getExchangeTargetId, query.getCouponId())
+                .eq(ExchangeCode::getStatus, query.getStatus())
+                .page(query.toMpPageDefaultSortByCreateTimeDesc());
+        List<ExchangeCode> records = page.getRecords();
+        if(CollUtils.isEmpty(records)){
+            return PageDTO.empty(page);
+        }
+        List<CodeVO> collect = records.stream().map(po -> {
+            CodeVO codeVO = new CodeVO();
+            codeVO.setId(po.getId())
+                    .setCode(po.getCode());
+            return codeVO;
+        }).collect(Collectors.toList());
+        log.info("返回结果:{}",collect);
+        return PageDTO.of(page, collect);
     }
 }

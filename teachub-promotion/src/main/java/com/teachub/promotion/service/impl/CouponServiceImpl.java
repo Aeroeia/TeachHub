@@ -193,4 +193,13 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
                 .eq(ExchangeCode::getExchangeTargetId,id)
                 .remove();
     }
+
+    //暂停发放优惠券
+    @Override
+    public void pauseCoupon(Long id) {
+        this.lambdaUpdate()
+                .eq(Coupon::getId,id)
+                .set(Coupon::getStatus, CouponStatus.PAUSE)
+                .update();
+    }
 }
