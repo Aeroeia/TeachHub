@@ -88,4 +88,11 @@ public class ExchangeCodeServiceImpl extends ServiceImpl<ExchangeCodeMapper, Exc
         log.info("返回结果:{}",collect);
         return PageDTO.of(page, collect);
     }
+
+    @Override
+    public boolean updateExchangeCode(long serialNum, boolean b) {
+        Boolean result = redisTemplate.opsForValue()
+                .setBit(PromotionConstants.COUPON_CODE_MAP_KEY, serialNum, b);
+        return result!=null&&result;
+    }
 }
