@@ -8,6 +8,7 @@ import com.teachub.promotion.domain.dto.CouponIssueFormDTO;
 import com.teachub.promotion.domain.dto.CouponQuery;
 import com.teachub.promotion.domain.vo.CouponDetailVO;
 import com.teachub.promotion.domain.vo.CouponPageVO;
+import com.teachub.promotion.domain.vo.CouponVO;
 import com.teachub.promotion.service.ICouponService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -17,6 +18,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.constraints.NotNull;
+import java.util.List;
 
 /**
  * <p>
@@ -83,6 +85,12 @@ public class CouponController {
     public void pauseCoupon(@PathVariable Long id) {
         log.info("暂停发放优惠券");
         couponService.pauseCoupon(id);
+    }
+    @ApiOperation("查询发放中优惠券")
+    @GetMapping("/list")
+    public List<CouponVO> queryList(){
+        log.info("查询发放中优惠券");
+        return couponService.queryList();
     }
 
 }
