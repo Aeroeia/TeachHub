@@ -17,6 +17,9 @@ import com.teachub.promotion.service.IExchangeCodeService;
 import com.teachub.promotion.service.IUserCouponService;
 import com.teachub.promotion.utils.CodeUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,11 +39,25 @@ import java.util.List;
 public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCoupon> implements IUserCouponService {
     private final CouponMapper couponMapper;
     private final IExchangeCodeService exchangeCodeService;
+    @Autowired
+    @Lazy
+    private UserCouponServiceImpl userCouponService;
+
     @Override
-    @Transactional
     public void receiveCoupon(Long id) {
         Long userId = UserContext.getUser();
-        if(userId==null){
+        //悲观锁
+        //Long比对会有问题 转为String调用intern强调从常量池中取对象
+        synchronized (userId.toString().intern()) {
+            userCouponService.receiveCopy(id);
+        }
+    }
+
+    //防止锁失效
+    @Transactional
+    public void receiveCopy(Long id) {
+        Long userId = UserContext.getUser();
+        if (userId == null) {
             throw new BadRequestException("请先登录");
         }
         //查找优惠券
@@ -70,49 +87,51 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
         //新增用户优惠券
         this.saveCoupon(coupon);
     }
+
     //兑换码兑换优惠券
     @Transactional
     @Override
     public void exchangeCode(String code) {
-        if(StringUtils.isBlank(code)){
+        if (StringUtils.isBlank(code)) {
             throw new BadRequestException("非法参数");
         }
         //解码
         long serialNum = CodeUtil.parseCode(code);
         //查询redis是否兑换过
-        boolean flag = exchangeCodeService.updateExchangeCode(serialNum,true);
-        if(flag){
+        boolean flag = exchangeCodeService.updateExchangeCode(serialNum, true);
+        if (flag) {
             throw new BizIllegalException("该优惠券已兑换");
         }
-        try{
+        //抛出异常时对redis进行回滚
+        try {
             ExchangeCode exchangeCode = exchangeCodeService.getById(serialNum);
-            if(exchangeCode==null){
+            if (exchangeCode == null) {
                 throw new BizIllegalException("兑换码不存在");
             }
+            //调用方法
             this.receiveCoupon(exchangeCode.getExchangeTargetId());
             exchangeCodeService.lambdaUpdate()
-                    .eq(ExchangeCode::getId,serialNum)
+                    .eq(ExchangeCode::getId, serialNum)
                     .set(ExchangeCode::getStatus, ExchangeCodeStatus.USED)
-                    .set(ExchangeCode::getUserId,UserContext.getUser())
+                    .set(ExchangeCode::getUserId, UserContext.getUser())
                     .update();
-        }
-        catch (Exception e){
-            log.error("用户领取优惠券失败",e);
-            exchangeCodeService.updateExchangeCode(serialNum,false);
+        } catch (Exception e) {
+            log.error("用户领取优惠券失败", e);
+            exchangeCodeService.updateExchangeCode(serialNum, false);
         }
     }
+
     private void saveCoupon(Coupon coupon) {
         Long userId = UserContext.getUser();
         UserCoupon userCoupon = new UserCoupon();
         userCoupon.setCouponId(coupon.getId())
                 .setStatus(UserCouponStatus.UNUSED)
                 .setUserId(userId);
-        if(coupon.getTermBeginTime()==null&&coupon.getTermEndTime()==null){
+        if (coupon.getTermBeginTime() == null && coupon.getTermEndTime() == null) {
             LocalDateTime now = LocalDateTime.now();
             userCoupon.setTermBeginTime(now);
             userCoupon.setTermEndTime(now.plusDays(coupon.getTermDays()));
-        }
-        else{
+        } else {
             userCoupon.setTermBeginTime(coupon.getTermBeginTime());
             userCoupon.setTermEndTime(coupon.getTermEndTime());
         }
