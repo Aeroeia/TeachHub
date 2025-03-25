@@ -16,4 +16,6 @@ public interface IUserCouponService extends IService<UserCoupon> {
     void receiveCoupon(Long id);
 
     void exchangeCode(String code);
+
+    void receiveCopy(Long id);
 }
