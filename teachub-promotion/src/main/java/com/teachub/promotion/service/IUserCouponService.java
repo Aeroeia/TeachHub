@@ -1,7 +1,10 @@
 package com.teachub.promotion.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.teachub.common.domain.dto.PageDTO;
+import com.teachub.promotion.domain.dto.CouponQuery;
 import com.teachub.promotion.domain.po.UserCoupon;
+import com.teachub.promotion.domain.vo.CouponVO;
 
 /**
  * <p>
@@ -18,4 +21,6 @@ public interface IUserCouponService extends IService<UserCoupon> {
     void exchangeCode(String code);
 
     void receiveCopy(Long id);
+
+    PageDTO<CouponVO> queryMyCoupons(CouponQuery couponQuery);
 }
