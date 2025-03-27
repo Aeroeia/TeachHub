@@ -9,6 +9,7 @@ import com.teachub.common.exceptions.BizIllegalException;
 import com.teachub.common.utils.BeanUtils;
 import com.teachub.common.utils.CollUtils;
 import com.teachub.common.utils.UserContext;
+import com.teachub.promotion.annotation.MyLock;
 import com.teachub.promotion.domain.dto.CouponQuery;
 import com.teachub.promotion.domain.po.Coupon;
 import com.teachub.promotion.domain.po.ExchangeCode;
@@ -23,17 +24,14 @@ import com.teachub.promotion.service.IExchangeCodeService;
 import com.teachub.promotion.service.IUserCouponService;
 import com.teachub.promotion.utils.CodeUtil;
 import lombok.RequiredArgsConstructor;
-import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -52,22 +50,12 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
     private final RedissonClient redissonClient;
 
     @Override
+    @MyLock()
     public void receiveCoupon(Long id) {
         Long userId = UserContext.getUser();
-        //悲观锁
-        String key = "lock:coupon:uid:" + userId;
-        RLock lock = redissonClient.getLock(key);
-        try {
-            boolean isLocked = lock.tryLock(); //看门狗机制生效 默认过期时间30s
-            if (!isLocked) {
-                throw new BizIllegalException("操作太频繁");
-            }
-            //从aop上下文获取代理对象
-            IUserCouponService iUserCouponService = (IUserCouponService) AopContext.currentProxy();
-            iUserCouponService.receiveCopy(id);
-        } finally {
-            lock.unlock();
-        }
+        //从aop上下文获取代理对象
+        IUserCouponService iUserCouponService = (IUserCouponService) AopContext.currentProxy();
+        iUserCouponService.receiveCopy(id);
     }
 
     //防止锁失效
