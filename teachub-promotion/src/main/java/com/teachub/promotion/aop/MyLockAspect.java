@@ -1,6 +1,5 @@
 package com.teachub.promotion.aop;
 
-import com.teachub.common.exceptions.BizIllegalException;
 import com.teachub.common.utils.UserContext;
 import com.teachub.promotion.annotation.MyLock;
 import com.teachub.promotion.utils.MyLockFactory;
@@ -10,7 +9,6 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.redisson.api.RLock;
-import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -18,8 +16,8 @@ import org.springframework.stereotype.Component;
 @Aspect
 @RequiredArgsConstructor
 public class MyLockAspect {
-    private final RedissonClient redissonClient;
     private final MyLockFactory myLockFactory;
+
     @Around("@annotation(myLock)")
     public Object tryLock(ProceedingJoinPoint pjp, MyLock myLock) throws Throwable {
         log.info("执行aop加锁操作");
@@ -28,11 +26,12 @@ public class MyLockAspect {
         log.info("加锁的key为：{}", key);
         //工厂获取锁
         RLock lock = myLockFactory.getLock(myLock.lockType(), key);
+        //策略模式
+        boolean flag = myLock.lockStrategy().tryLock(lock, myLock);
+        if(!flag){
+            return null;
+        }
         try {
-            boolean flag = lock.tryLock(myLock.waitTime(), myLock.leaseTime(), myLock.unit());
-            if(!flag){
-                throw new BizIllegalException("操作太频繁");
-            }
             return pjp.proceed();
         }
         finally {

@@ -1,5 +1,6 @@
 package com.teachub.promotion.annotation;
 
+import com.teachub.promotion.enums.MyLockStrategy;
 import com.teachub.promotion.enums.MyLockType;
 
 import java.lang.annotation.ElementType;
@@ -19,5 +20,7 @@ public @interface MyLock {
     TimeUnit unit() default TimeUnit.SECONDS;
 
     MyLockType lockType() default MyLockType.RE_ENTRANT_LOCK;
+
+    MyLockStrategy lockStrategy() default MyLockStrategy.FAIL_AFTER_RETRY_TIMEOUT;
 
 }
