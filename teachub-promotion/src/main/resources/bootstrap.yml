@@ -39,3 +39,7 @@ teachub:
   auth:
     resource:
       enable: true
+  mq:
+    listener:
+      retry:
+        stateless: false
