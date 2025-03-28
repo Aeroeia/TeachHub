@@ -3,6 +3,7 @@ package com.teachub.promotion.aop;
 import com.teachub.common.exceptions.BizIllegalException;
 import com.teachub.common.utils.UserContext;
 import com.teachub.promotion.annotation.MyLock;
+import com.teachub.promotion.utils.MyLockFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -18,13 +19,15 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class MyLockAspect {
     private final RedissonClient redissonClient;
+    private final MyLockFactory myLockFactory;
     @Around("@annotation(myLock)")
     public Object tryLock(ProceedingJoinPoint pjp, MyLock myLock) throws Throwable {
         log.info("执行aop加锁操作");
         //悲观锁
         String key = "lock:coupon:uid:" + UserContext.getUser();
         log.info("加锁的key为：{}", key);
-        RLock lock = redissonClient.getLock(key);
+        //工厂获取锁
+        RLock lock = myLockFactory.getLock(myLock.lockType(), key);
         try {
             boolean flag = lock.tryLock(myLock.waitTime(), myLock.leaseTime(), myLock.unit());
             if(!flag){
