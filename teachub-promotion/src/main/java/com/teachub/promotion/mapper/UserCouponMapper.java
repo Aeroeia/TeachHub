@@ -1,7 +1,11 @@
 package com.teachub.promotion.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.teachub.promotion.domain.po.Coupon;
 import com.teachub.promotion.domain.po.UserCoupon;
+import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
 
 /**
  * <p>
@@ -12,5 +16,6 @@ import com.teachub.promotion.domain.po.UserCoupon;
  * @since 2025-08-01
  */
 public interface UserCouponMapper extends BaseMapper<UserCoupon> {
+    List<Coupon> queryMyCoupon(@Param("userId") Long userId);
 
 }
