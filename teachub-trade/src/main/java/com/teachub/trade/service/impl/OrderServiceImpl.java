@@ -6,8 +6,10 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.teachub.api.client.course.CourseClient;
 import com.teachub.api.constants.CourseStatus;
 import com.teachub.api.dto.course.CourseSimpleInfoDTO;
+import com.teachub.api.dto.promotion.CouponDiscountDTO;
+import com.teachub.api.dto.promotion.OrderCourseDTO;
 import com.teachub.api.dto.trade.OrderBasicDTO;
-import com.teachub.trade.domain.vo.*;
+import com.teachub.api.promotion.PromotionClient;
 import com.teachub.common.autoconfigure.mq.RabbitMqHelper;
 import com.teachub.common.constants.MqConstants;
 import com.teachub.common.domain.dto.PageDTO;
@@ -26,6 +28,7 @@ import com.teachub.trade.domain.dto.PlaceOrderDTO;
 import com.teachub.trade.domain.po.Order;
 import com.teachub.trade.domain.po.OrderDetail;
 import com.teachub.trade.domain.query.OrderPageQuery;
+import com.teachub.trade.domain.vo.*;
 import com.teachub.trade.mapper.OrderMapper;
 import com.teachub.trade.service.ICartService;
 import com.teachub.trade.service.IOrderDetailService;
@@ -49,8 +52,8 @@ import static com.teachub.trade.constants.TradeErrorInfo.ORDER_NOT_EXISTS;
  * 订单 服务实现类
  * </p>
  *
- *
- * @  08-29
+ * @author 虎哥
+ * @since 2022-08-29
  */
 @Service
 @RequiredArgsConstructor
@@ -61,7 +64,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     private final ICartService cartService;
     private final TradeProperties tradeProperties;
     private final RabbitMqHelper rabbitMqHelper;
-
+    private final PromotionClient promotionClient;
     @Override
     @Transactional
     public PlaceOrderResultVO placeOrder(PlaceOrderDTO placeOrderDTO) {
@@ -192,14 +195,23 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         // 2.计算总价
         int total = courseInfos.stream().mapToInt(CourseSimpleInfoDTO::getPrice).sum();
         // TODO 3.计算折扣
-        int discountAmount = 0;
+        //通过feign远程调用获取折扣方案
+        List<OrderCourseDTO> dtos = new ArrayList<>();
+        for(CourseSimpleInfoDTO info : courseInfos){
+            OrderCourseDTO dto = new OrderCourseDTO();
+            dto.setPrice(info.getPrice());
+            dto.setId(info.getId());
+            dto.setCateId(info.getThirdCateId());
+            dtos.add(dto);
+        }
+        List<CouponDiscountDTO> discountSolution = promotionClient.findDiscountSolution(dtos);
         // 4.生成订单id
         long orderId = IdWorker.getId();
         // 5.组织返回
         OrderConfirmVO vo = new OrderConfirmVO();
         vo.setOrderId(orderId);
         vo.setTotalAmount(total);
-        vo.setDiscountAmount(discountAmount);
+        vo.setDiscounts(discountSolution);
         vo.setCourses(courses);
         return vo;
     }
@@ -249,8 +261,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         }
         // 2.判断订单状态是否已经取消，幂等判断
         if(OrderStatus.CLOSED.equalsValue(order.getStatus())){
-           // 订单已经取消，无需重复操作
-           return;
+            // 订单已经取消，无需重复操作
+            return;
         }
         // 3.判断订单是否未支付，只有未支付订单才可以取消
         if(!OrderStatus.NO_PAY.equalsValue(order.getStatus())){

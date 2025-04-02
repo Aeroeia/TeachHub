@@ -274,7 +274,7 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
         //映射出课程id->优惠价集合
         Map<Long, Integer> courseDiscount = courseDTOS.stream().collect(Collectors.toMap(OrderCourseDTO::getId, u -> 0));
         //遍历优惠券
-        CouponDiscountDTO result = new CouponDiscountDTO(List.of(), List.of(), 0);
+        CouponDiscountDTO result = new CouponDiscountDTO();
         for (Coupon coupon : solution) {
             //获取优惠券下可用课程集合
             List<OrderCourseDTO> orderCourseDTOS = map.get(coupon);
