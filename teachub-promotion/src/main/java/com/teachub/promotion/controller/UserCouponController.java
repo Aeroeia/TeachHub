@@ -34,7 +34,6 @@ public class UserCouponController {
         log.info("用户兑换码兑换优惠券，id：{}", code);
         userCouponService.exchangeCode(code);
     }
-
     @ApiOperation("查询我的优惠券")
     @GetMapping("/page")
     public PageDTO<CouponVO> queryMyCoupons(CouponQuery couponQuery){
@@ -43,7 +42,7 @@ public class UserCouponController {
     }
     @ApiOperation("查询可用优惠券方案")
     @PostMapping("/available")
-    public List<CouponDiscountDTO> findDiscountSolution(@RequestBody List<OrderCourseDTO> courseDTOS){
+    public List<CouponDiscountDTO> findDiscountSolution(@RequestBody List<OrderCourseDTO> courseDTOS) throws InterruptedException {
         log.info("查询可用优惠券方案：{}", courseDTOS);
         return userCouponService.findDiscountSolution(courseDTOS);
     }
