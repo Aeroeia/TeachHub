@@ -1,4 +1,5 @@
 # TeachHub
+
 ## 整体架构
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tianji-system.jpg)
 - 点赞 zset set
@@ -15,7 +16,15 @@
 - 思考如何解决兑换码、优惠券过期清理问题
 - 乐观锁悲观锁 String.intern()
 - 事务失效 锁问题
+- 异步意义 削峰填谷
+- 领券优化 redis+异步
+- 防连点 交易服务preOrder
+- 点赞记录 冷热分离
+- 点赞数 --改hash
+- 优惠券推荐 初筛 细筛 排列组合
+- completableFuture 多线程
 ## 一、我的课表模块开发 
+
 >Tips:在分布式系统中，使用数据库自增ID容易造成性能瓶颈和ID冲突，因为多个节点同时生成ID需要依赖数据库集中控制。而雪花算法（Snowflake）能在不同节点上本地高效、唯一地生成ID，避免分布式锁和数据库竞争问题，具有高可用、无中心、趋势递增等优点。因此，分布式系统推荐采用雪花算法而非默认的自增ID
 ---
 ### 业务流程分析
@@ -25,6 +34,7 @@
 - 未学习，已购买课程还未开始学习，可以开始学习
 - 已学习，已购买课程已开始学习，展示学习进度，可以继续学习
 - 已学完，已购买课程已经学完，可以重新学习
+
 - 已失效，已购买课程已过期，不可继续学习，只能删除课程操作
 
 
@@ -40,6 +50,7 @@
 | 校验指定课程是否是有效课表课程（Feign）| GET      | /lessons/{courseId}/valid        | Feign 接口，用于远程调用校验     |
 | 统计课程学习人数（Feign）              | GET      | /lessons/{courseId}/count        | Feign 接口，用于远程统计人数     |
 ### 表结构设计
+
 #### ER图
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/Unknown.png)
 #### 字段分析

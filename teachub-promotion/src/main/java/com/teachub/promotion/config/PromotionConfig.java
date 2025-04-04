@@ -28,4 +28,20 @@ public class PromotionConfig {
         executor.initialize();
         return executor;
     }
+    @Bean
+    public Executor calculateSolutionExecutor(){
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        // 1.核心线程池大小
+        executor.setCorePoolSize(5);
+        // 2.最大线程池大小
+        executor.setMaxPoolSize(10);
+        // 3.队列大小
+        executor.setQueueCapacity(200);
+        // 4.线程名称
+        executor.setThreadNamePrefix("calculate-solution-handler-");
+        // 5.拒绝策略
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.initialize();
+        return executor;
+    }
 }
