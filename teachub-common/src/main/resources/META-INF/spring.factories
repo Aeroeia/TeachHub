@@ -1,5 +1,5 @@
 org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
- com.teachub.common.autoconfigure.mq.MqConfig,\
+ com.teachub.common.autoconfigure.mq.RocketMqConfig,\
  com.teachub.common.autoconfigure.mvc.JsonConfig,\
  com.teachub.common.autoconfigure.mvc.MvcConfig,\
  com.teachub.common.autoconfigure.mvc.ParamCheckerConfig,\
