@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.OrderItem;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.teachub.common.autoconfigure.mq.RabbitMqHelper;
+import com.teachub.common.autoconfigure.mq.RocketMqHelper;
 import com.teachub.common.autoconfigure.redisson.annotations.Lock;
 import com.teachub.common.constants.MqConstants;
 import com.teachub.common.domain.dto.PageDTO;
@@ -47,7 +47,7 @@ public class RefundOrderServiceImpl extends ServiceImpl<RefundOrderMapper, Refun
 
     private final IPayOrderService payOrderService;
 
-    private final RabbitMqHelper rabbitMqHelper;
+    private final RocketMqHelper rocketMqHelper;
 
     @Resource
     private Map<String, IPayService> payServiceChannels;
@@ -239,9 +239,9 @@ public class RefundOrderServiceImpl extends ServiceImpl<RefundOrderMapper, Refun
         updateRefundStatus(refundResponse, refundOrder.getId());
 
         // 4.发送MQ通知业务端
-        rabbitMqHelper.send(
-                MqConstants.Exchange.PAY_EXCHANGE,
-                MqConstants.Key.REFUND_CHANGE,
+        rocketMqHelper.send(
+                MqConstants.Topic.PAY_TOPIC,
+                MqConstants.Tag.REFUND_CHANGE,
                 RefundResultDTO.success()
                         .refundOrderNo(refundOrder.getRefundOrderNo())
                         .bizPayOrderId(refundOrder.getBizOrderNo())

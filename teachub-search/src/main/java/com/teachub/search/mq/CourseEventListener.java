@@ -1,51 +1,51 @@
 package com.teachub.search.mq;
 
+import com.teachub.common.constants.MqConstants;
 import com.teachub.search.service.ICourseService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.core.ExchangeTypes;
-import org.springframework.amqp.rabbit.annotation.Exchange;
-import org.springframework.amqp.rabbit.annotation.Queue;
-import org.springframework.amqp.rabbit.annotation.QueueBinding;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
+import org.apache.rocketmq.spring.core.RocketMQListener;
 import org.springframework.stereotype.Component;
 
-import static com.teachub.common.constants.MqConstants.Exchange.COURSE_EXCHANGE;
-import static com.teachub.common.constants.MqConstants.Key.*;
-
 @Slf4j
-@Component
 public class CourseEventListener {
 
-    @Autowired
-    private ICourseService courseService;
+    @Component
+    @RequiredArgsConstructor
+    @RocketMQMessageListener(topic = MqConstants.Topic.COURSE_TOPIC, consumerGroup = "search_course_up_consumer_group", selectorExpression = MqConstants.Tag.COURSE_UP)
+    public static class CourseUpListener implements RocketMQListener<Long> {
+        private final ICourseService courseService;
 
-    @RabbitListener(bindings = @QueueBinding(
-            value = @Queue(name = "search.course.up.queue", durable = "true"),
-            exchange = @Exchange(name = COURSE_EXCHANGE, type = ExchangeTypes.TOPIC),
-            key = COURSE_UP_KEY
-    ))
-    public void listenCourseUp(Long courseId){
-        log.debug("监听到课程{}上架", courseId);
-        courseService.handleCourseUp(courseId);
+        @Override
+        public void onMessage(Long courseId){
+            log.debug("监听到课程{}上架", courseId);
+            courseService.handleCourseUp(courseId);
+        }
     }
 
-    @RabbitListener(bindings = @QueueBinding(
-            value = @Queue(name = "search.course.down.queue", durable = "true"),
-            exchange = @Exchange(name = COURSE_EXCHANGE, type = ExchangeTypes.TOPIC),
-            key = COURSE_DOWN_KEY
-    ))
-    public void listenCourseDown(Long courseId){
-        log.debug("监听到课程{}下架", courseId);
-        courseService.handleCourseDelete(courseId);
+    @Component
+    @RequiredArgsConstructor
+    @RocketMQMessageListener(topic = MqConstants.Topic.COURSE_TOPIC, consumerGroup = "search_course_down_consumer_group", selectorExpression = MqConstants.Tag.COURSE_DOWN)
+    public static class CourseDownListener implements RocketMQListener<Long> {
+        private final ICourseService courseService;
+
+        @Override
+        public void onMessage(Long courseId){
+            log.debug("监听到课程{}下架", courseId);
+            courseService.handleCourseDelete(courseId);
+        }
     }
 
-    @RabbitListener(bindings = @QueueBinding(
-            value = @Queue(name = "search.course.expire.queue", durable = "true"),
-            exchange = @Exchange(name = COURSE_EXCHANGE, type = ExchangeTypes.TOPIC),
-            key = COURSE_EXPIRE_KEY
-    ))
-    public void listenCourseExpire(Long courseId){
-        courseService.handleCourseDelete(courseId);
+    @Component
+    @RequiredArgsConstructor
+    @RocketMQMessageListener(topic = MqConstants.Topic.COURSE_TOPIC, consumerGroup = "search_course_expire_consumer_group", selectorExpression = MqConstants.Tag.COURSE_EXPIRE)
+    public static class CourseExpireListener implements RocketMQListener<Long> {
+        private final ICourseService courseService;
+
+        @Override
+        public void onMessage(Long courseId){
+            courseService.handleCourseDelete(courseId);
+        }
     }
 }

@@ -3,7 +3,7 @@ package com.teachub.promotion.service.impl;
 import cn.hutool.core.bean.copier.CopyOptions;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.teachub.common.autoconfigure.mq.RabbitMqHelper;
+import com.teachub.common.autoconfigure.mq.RocketMqHelper;
 import com.teachub.common.constants.MqConstants;
 import com.teachub.common.domain.dto.PageDTO;
 import com.teachub.common.exceptions.BadRequestException;
@@ -65,7 +65,7 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
     private final CouponMapper couponMapper;
     private final IExchangeCodeService exchangeCodeService;
     private final StringRedisTemplate redisTemplate;
-    private final RabbitMqHelper rabbitMqHelper;
+    private final RocketMqHelper rocketMqHelper;
     private final ICouponScopeService couponScopeService;
     private final Executor calculateSolutionExecutor;
 
@@ -129,8 +129,8 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
         UserCouponDTO userCouponDTO = new UserCouponDTO();
         userCouponDTO.setCouponId(id);
         userCouponDTO.setUserId(userId);
-        rabbitMqHelper.send(MqConstants.Exchange.PROMOTION_EXCHANGE,
-                MqConstants.Key.COUPON_RECEIVE,
+        rocketMqHelper.send(MqConstants.Topic.PROMOTION_TOPIC,
+                MqConstants.Tag.COUPON_RECEIVE,
                 userCouponDTO);
     }
 

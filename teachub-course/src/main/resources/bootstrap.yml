@@ -22,6 +22,10 @@ spring:
           - data-id: shared-mq.yaml # 共享MQ配置
           - data-id: shared-seata.yaml # 共享seata配置
           - data-id: shared-xxljob.yaml # 共享seata配置
+rocketmq:
+  name-server: 127.0.0.1:9876
+  producer:
+    group: ${spring.application.name}-group
 teachub:
   swagger:
     enable: true

@@ -19,6 +19,10 @@ spring:
           - dataId: shared-feign.yaml # 共享feign配置
           - dataId: shared-mq.yaml # 共享mq配置
           - dataId: shared-xxljob.yaml # 共享mq配置
+rocketmq:
+  name-server: 127.0.0.1:9876
+  producer:
+    group: ${spring.application.name}-group
 teachub:
   swagger:
     enable: true

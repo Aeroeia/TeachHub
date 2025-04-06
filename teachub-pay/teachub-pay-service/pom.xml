@@ -87,7 +87,7 @@
             <artifactId>wechatpay-apache-httpclient</artifactId>
             <version>0.4.8</version>
         </dependency>
-        <!--rabbitMq-->
+        <!--rocketMq-->
         <dependency>
             <groupId>org.apache.rocketmq</groupId>
             <artifactId>rocketmq-spring-boot-starter</artifactId>

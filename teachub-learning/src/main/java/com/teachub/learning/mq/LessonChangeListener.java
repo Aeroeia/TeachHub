@@ -6,49 +6,51 @@ import com.teachub.common.constants.MqConstants;
 import com.teachub.learning.service.ILearningLessonService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.core.ExchangeTypes;
-import org.springframework.amqp.rabbit.annotation.Exchange;
-import org.springframework.amqp.rabbit.annotation.Queue;
-import org.springframework.amqp.rabbit.annotation.QueueBinding;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
+import org.apache.rocketmq.spring.core.RocketMQListener;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-@Component
 @Slf4j
-@RequiredArgsConstructor
 public class LessonChangeListener {
-    private final ILearningLessonService learningLessonService;
-    @RabbitListener(bindings = @QueueBinding(
-            value = @Queue(name = MqConstants.Queue.LEARNING_LESSON_PAY_QUEUE,durable = "true"),
-            exchange = @Exchange(name = MqConstants.Exchange.ORDER_EXCHANGE,type = ExchangeTypes.TOPIC),
-            key = MqConstants.Key.ORDER_PAY_KEY)
-    )
-    public void onMessage(OrderBasicDTO orderBasicDTO){
-        log.info("收到报名通知：{}",orderBasicDTO);
-        if(orderBasicDTO.getOrderId()==null||
-        orderBasicDTO.getUserId()==null||
-                CollUtil.isEmpty(orderBasicDTO.getCourseIds())){
-            //不抛出异常 否则重试到结束
-            return;
+
+    @Component
+    @RequiredArgsConstructor
+    @RocketMQMessageListener(topic = MqConstants.Topic.ORDER_TOPIC, consumerGroup = "learning_lesson_pay_consumer_group", selectorExpression = MqConstants.Tag.ORDER_PAY)
+    public static class PayListener implements RocketMQListener<OrderBasicDTO> {
+        private final ILearningLessonService learningLessonService;
+
+        @Override
+        public void onMessage(OrderBasicDTO orderBasicDTO){
+            log.info("收到报名通知：{}",orderBasicDTO);
+            if(orderBasicDTO.getOrderId()==null||
+                    orderBasicDTO.getUserId()==null||
+                    CollUtil.isEmpty(orderBasicDTO.getCourseIds())){
+                //不抛出异常 否则重试到结束
+                return;
+            }
+            Long userId = orderBasicDTO.getUserId();
+            List<Long> courseIds = orderBasicDTO.getCourseIds();
+            learningLessonService.saveLearningLeesons(userId,courseIds);
         }
-        Long userId = orderBasicDTO.getUserId();
-        List<Long> courseIds = orderBasicDTO.getCourseIds();
-        learningLessonService.saveLearningLeesons(userId,courseIds);
     }
-    @RabbitListener(bindings = @QueueBinding(
-            value = @Queue(name = MqConstants.Queue.LEARNING_LESSON_REFUND_QUEUE,durable = "true"),
-            exchange = @Exchange(name = MqConstants.Exchange.ORDER_EXCHANGE,type = ExchangeTypes.TOPIC),
-            key = MqConstants.Key.ORDER_REFUND_KEY
-    ))
-    public void onRefundMessage(OrderBasicDTO orderBasicDTO){
-        log.info("收到退课通知：{}",orderBasicDTO);
-        if(orderBasicDTO==null){
-            return;
+
+    @Component
+    @RequiredArgsConstructor
+    @RocketMQMessageListener(topic = MqConstants.Topic.ORDER_TOPIC, consumerGroup = "learning_lesson_refund_consumer_group", selectorExpression = MqConstants.Tag.ORDER_REFUND)
+    public static class RefundListener implements RocketMQListener<OrderBasicDTO> {
+        private final ILearningLessonService learningLessonService;
+
+        @Override
+        public void onMessage(OrderBasicDTO orderBasicDTO){
+            log.info("收到退课通知：{}",orderBasicDTO);
+            if(orderBasicDTO==null){
+                return;
+            }
+            Long userId = orderBasicDTO.getUserId();
+            Long courseId = orderBasicDTO.getCourseIds().get(0);
+            learningLessonService.delete(userId,courseId);
         }
-        Long userId = orderBasicDTO.getUserId();
-        Long courseId = orderBasicDTO.getCourseIds().get(0);
-        learningLessonService.delete(userId,courseId);
     }
 }

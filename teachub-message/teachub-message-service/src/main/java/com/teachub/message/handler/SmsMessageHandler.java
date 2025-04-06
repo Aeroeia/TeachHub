@@ -4,24 +4,19 @@ import com.teachub.api.dto.sms.SmsInfoDTO;
 import com.teachub.common.constants.MqConstants;
 import com.teachub.message.service.ISmsService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.amqp.rabbit.annotation.Exchange;
-import org.springframework.amqp.rabbit.annotation.Queue;
-import org.springframework.amqp.rabbit.annotation.QueueBinding;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
+import org.apache.rocketmq.spring.core.RocketMQListener;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-public class SmsMessageHandler {
+@RocketMQMessageListener(topic = MqConstants.Topic.SMS_TOPIC, consumerGroup = "sms_consumer_group", selectorExpression = MqConstants.Tag.SMS_MESSAGE)
+public class SmsMessageHandler implements RocketMQListener<SmsInfoDTO> {
 
     private final ISmsService smsService;
 
-    @RabbitListener(bindings = @QueueBinding(
-            value = @Queue(name = "sms.message.queue", durable = "true"),
-            exchange = @Exchange(MqConstants.Exchange.SMS_EXCHANGE),
-            key = MqConstants.Key.SMS_MESSAGE
-    ))
-    public void listenSmsMessage(SmsInfoDTO smsInfoDTO){
+    @Override
+    public void onMessage(SmsInfoDTO smsInfoDTO){
         smsService.sendMessage(smsInfoDTO);
     }
 }

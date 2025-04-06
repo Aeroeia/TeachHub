@@ -1,6 +1,6 @@
 package com.teachub.trade.service.impl;
 
-import com.teachub.common.autoconfigure.mq.RabbitMqHelper;
+import com.teachub.common.autoconfigure.mq.RocketMqHelper;
 import com.teachub.common.exceptions.BadRequestException;
 import com.teachub.common.exceptions.BizIllegalException;
 import com.teachub.common.utils.AssertUtils;
@@ -31,8 +31,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static com.teachub.common.constants.MqConstants.Exchange.TRADE_DELAY_EXCHANGE;
-import static com.teachub.common.constants.MqConstants.Key.ORDER_DELAY_KEY;
+import static com.teachub.common.constants.MqConstants.Topic.TRADE_DELAY_TOPIC;
+import static com.teachub.common.constants.MqConstants.Tag.ORDER_DELAY;
 import static com.teachub.trade.constants.TradeErrorInfo.ORDER_NOT_EXISTS;
 
 @Slf4j
@@ -44,7 +44,7 @@ public class PayServiceImpl implements IPayService {
     private final IOrderService orderService;
     private final IOrderDetailService detailService;
     private final TradeProperties tradeProperties;
-    private final RabbitMqHelper mqHelper;
+    private final RocketMqHelper rocketMqHelper;
 
     @Override
     public List<PayChannelVO> queryPayChannels() {
@@ -96,9 +96,9 @@ public class PayServiceImpl implements IPayService {
     }
 
     private void sendDelayQueryMessage(OrderDelayQueryDTO message) {
-        mqHelper.sendDelayMessage(
-                TRADE_DELAY_EXCHANGE,
-                ORDER_DELAY_KEY,
+        rocketMqHelper.sendDelayMessage(
+                TRADE_DELAY_TOPIC,
+                ORDER_DELAY,
                 message, Duration.ofMillis(message.removeFirst()));
     }
 

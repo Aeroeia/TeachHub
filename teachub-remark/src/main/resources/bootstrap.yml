@@ -26,6 +26,10 @@ spring:
             refresh: false
           - data-id: like-types.yaml
             refresh: false
+rocketmq:
+  name-server: 127.0.0.1:9876
+  producer:
+    group: ${spring.application.name}-group
 teachub:
   swagger:
     enable: true
