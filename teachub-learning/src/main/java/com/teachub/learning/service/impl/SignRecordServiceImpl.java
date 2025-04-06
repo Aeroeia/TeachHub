@@ -1,6 +1,6 @@
 package com.teachub.learning.service.impl;
 
-import com.teachub.common.autoconfigure.mq.RabbitMqHelper;
+import com.teachub.common.autoconfigure.mq.RocketMqHelper;
 import com.teachub.common.constants.MqConstants;
 import com.teachub.common.exceptions.BadRequestException;
 import com.teachub.common.exceptions.BizIllegalException;
@@ -26,7 +26,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SignRecordServiceImpl implements ISignRecordService {
     private final StringRedisTemplate redisTemplate;
-    private final RabbitMqHelper rabbitMqHelper;
+    private final RocketMqHelper rocketMqHelper;
 
     @Override
     public SignResultVO addSignRecord() {
@@ -75,8 +75,8 @@ public class SignRecordServiceImpl implements ISignRecordService {
         }
         SignResultVO signResultVO = new SignResultVO(count, 1, rewardPoints);
         //mq异步更新积分记录
-        rabbitMqHelper.send(MqConstants.Exchange.LEARNING_EXCHANGE,
-                MqConstants.Key.SIGN_IN,
+        rocketMqHelper.send(MqConstants.Topic.LEARNING_TOPIC,
+                MqConstants.Tag.SIGN_IN,
                 SignInMessage.of(userId, signResultVO.totalPoints()));
         return signResultVO;
     }

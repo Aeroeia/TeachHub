@@ -10,7 +10,7 @@ import com.teachub.api.dto.promotion.CouponDiscountDTO;
 import com.teachub.api.dto.promotion.OrderCourseDTO;
 import com.teachub.api.dto.trade.OrderBasicDTO;
 import com.teachub.api.promotion.PromotionClient;
-import com.teachub.common.autoconfigure.mq.RabbitMqHelper;
+import com.teachub.common.autoconfigure.mq.RocketMqHelper;
 import com.teachub.common.constants.MqConstants;
 import com.teachub.common.domain.dto.PageDTO;
 import com.teachub.common.exceptions.BadRequestException;
@@ -63,7 +63,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     private final IOrderDetailService detailService;
     private final ICartService cartService;
     private final TradeProperties tradeProperties;
-    private final RabbitMqHelper rabbitMqHelper;
+    private final RocketMqHelper rocketMqHelper;
     private final PromotionClient promotionClient;
     @Override
     @Transactional
@@ -166,9 +166,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         saveOrderAndDetails(order, CollUtils.singletonList(detail));
 
         // 5.发送MQ消息，通知报名成功
-        rabbitMqHelper.send(
-                MqConstants.Exchange.ORDER_EXCHANGE,
-                MqConstants.Key.ORDER_PAY_KEY,
+        rocketMqHelper.send(
+                MqConstants.Topic.ORDER_TOPIC,
+                MqConstants.Tag.ORDER_PAY,
                 OrderBasicDTO.builder()
                         .orderId(orderId)
                         .userId(userId)
@@ -407,9 +407,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         // 4.查询订单包含的课程信息
         List<Long> cIds = detailService.queryCourseIdsByOrderId(o.getId());
         // 5.发送MQ消息，通知报名成功
-        rabbitMqHelper.send(
-                MqConstants.Exchange.ORDER_EXCHANGE,
-                MqConstants.Key.ORDER_PAY_KEY,
+        rocketMqHelper.send(
+                MqConstants.Topic.ORDER_TOPIC,
+                MqConstants.Tag.ORDER_PAY,
                 OrderBasicDTO.builder()
                         .orderId(o.getId()).userId(order.getUserId()).courseIds(cIds)
                         .finishTime(o.getPayTime())

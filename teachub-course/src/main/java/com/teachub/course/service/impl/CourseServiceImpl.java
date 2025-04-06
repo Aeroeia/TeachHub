@@ -16,7 +16,7 @@ import com.teachub.api.dto.user.UserDTO;
 import com.teachub.common.utils.*;
 import com.teachub.course.domain.vo.*;
 import com.teachub.course.service.*;
-import com.teachub.common.autoconfigure.mq.RabbitMqHelper;
+import com.teachub.common.autoconfigure.mq.RocketMqHelper;
 import com.teachub.common.constants.ErrorInfo;
 import com.teachub.common.constants.MqConstants;
 import com.teachub.common.domain.dto.PageDTO;
@@ -67,7 +67,7 @@ public class CourseServiceImpl extends ServiceImpl<CourseMapper, Course> impleme
     private ICourseDraftService courseDraftService;
 
     @Autowired
-    private RabbitMqHelper rabbitMqHelper;
+    private RocketMqHelper rocketMqHelper;
 
     @Autowired
     private ICourseCatalogueService courseCatalogueService;
@@ -159,7 +159,7 @@ public class CourseServiceImpl extends ServiceImpl<CourseMapper, Course> impleme
         //1.删除草稿信息
         courseDraftService.delete(id);
         //2.发送删除草稿mq
-        rabbitMqHelper.send(MqConstants.Exchange.COURSE_EXCHANGE, MqConstants.Key.COURSE_DELETE_KEY, id);
+        rocketMqHelper.send(MqConstants.Topic.COURSE_TOPIC, MqConstants.Tag.COURSE_DELETE, id);
     }
 
     @Override
@@ -523,8 +523,8 @@ public class CourseServiceImpl extends ServiceImpl<CourseMapper, Course> impleme
     private void sendFinishedCourse(List<Course> finishedCourse) {
         //1.遍历发送课程完结mq
         for (Course course : finishedCourse) {
-            rabbitMqHelper.sendAsync(MqConstants.Exchange.COURSE_EXCHANGE,
-                    MqConstants.Key.COURSE_EXPIRE_KEY,
+            rocketMqHelper.sendAsync(MqConstants.Topic.COURSE_TOPIC,
+                    MqConstants.Tag.COURSE_EXPIRE,
                     course.getId());
         }
     }

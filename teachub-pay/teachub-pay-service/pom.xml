@@ -65,6 +65,11 @@
             <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>com.alipay.sdk</groupId>
+            <artifactId>alipay-sdk-java</artifactId>
+        </dependency>
+
         <!--config-->
         <dependency>
             <groupId>com.alibaba.cloud</groupId>

@@ -17,7 +17,7 @@ import com.teachub.common.utils.*;
 import com.teachub.course.domain.po.*;
 import com.teachub.course.mapper.*;
 import com.teachub.course.service.*;
-import com.teachub.common.autoconfigure.mq.RabbitMqHelper;
+import com.teachub.common.autoconfigure.mq.RocketMqHelper;
 import com.teachub.common.constants.ErrorInfo;
 import com.teachub.common.constants.MqConstants;
 import com.teachub.common.domain.dto.PageDTO;
@@ -94,7 +94,7 @@ public class CourseDraftServiceImpl extends ServiceImpl<CourseDraftMapper, Cours
     private ICategoryService categoryService;
 
     @Autowired
-    private RabbitMqHelper rabbitMqHelper;
+    private RocketMqHelper rocketMqHelper;
 
     @Autowired
     private TradeClient tradeClient;
@@ -404,7 +404,7 @@ public class CourseDraftServiceImpl extends ServiceImpl<CourseDraftMapper, Cours
 
         }
         //5.课程上架mq
-        rabbitMqHelper.send(MqConstants.Exchange.COURSE_EXCHANGE, MqConstants.Key.COURSE_UP_KEY, id);
+        rocketMqHelper.send(MqConstants.Topic.COURSE_TOPIC, MqConstants.Tag.COURSE_UP, id);
     }
 
     @Override
@@ -471,7 +471,7 @@ public class CourseDraftServiceImpl extends ServiceImpl<CourseDraftMapper, Cours
         //7.课程老师copy到草稿中
         courseTeacherDraftMapper.insertFromCourseTeacher(id);
         //8.下架mq广播
-        rabbitMqHelper.send(MqConstants.Exchange.COURSE_EXCHANGE, MqConstants.Key.COURSE_DOWN_KEY, id);
+        rocketMqHelper.send(MqConstants.Topic.COURSE_TOPIC, MqConstants.Tag.COURSE_DOWN, id);
     }
 
     @GlobalTransactional

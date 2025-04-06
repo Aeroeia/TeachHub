@@ -6,7 +6,7 @@ import com.teachub.api.cache.RoleCache;
 import com.teachub.api.client.user.UserClient;
 import com.teachub.api.dto.trade.OrderBasicDTO;
 import com.teachub.api.dto.user.UserDTO;
-import com.teachub.common.autoconfigure.mq.RabbitMqHelper;
+import com.teachub.common.autoconfigure.mq.RocketMqHelper;
 import com.teachub.common.constants.Constant;
 import com.teachub.common.constants.ErrorInfo;
 import com.teachub.common.constants.MqConstants;
@@ -67,7 +67,7 @@ public class RefundApplyServiceImpl extends ServiceImpl<RefundApplyMapper, Refun
     private final PayClient payClient;
     private final RoleCache roleCache;
     private final ThreadPoolTaskExecutor sendRefundRequestExecutor;
-    private final RabbitMqHelper rabbitMqHelper;
+    private final RocketMqHelper rocketMqHelper;
 
     @Override
     public List<RefundApply> queryByDetailId(Long id) {
@@ -447,9 +447,9 @@ public class RefundApplyServiceImpl extends ServiceImpl<RefundApplyMapper, Refun
             // 4.1.查询子订单信息
             OrderDetail detail = detailService.getById(refundApply.getOrderDetailId());
             // 4.2.发送MQ消息，通知报名成功
-            rabbitMqHelper.send(
-                    MqConstants.Exchange.ORDER_EXCHANGE,
-                    MqConstants.Key.ORDER_REFUND_KEY,
+            rocketMqHelper.send(
+                    MqConstants.Topic.ORDER_TOPIC,
+                    MqConstants.Tag.ORDER_REFUND,
                     OrderBasicDTO.builder()
                             .orderId(refundApply.getOrderId())
                             .userId(refundApply.getUserId())

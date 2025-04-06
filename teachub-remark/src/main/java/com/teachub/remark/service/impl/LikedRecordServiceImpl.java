@@ -2,7 +2,7 @@ package com.teachub.remark.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.teachub.api.dto.remark.LikedTimesDTO;
-import com.teachub.common.autoconfigure.mq.RabbitMqHelper;
+import com.teachub.common.autoconfigure.mq.RocketMqHelper;
 import com.teachub.common.constants.MqConstants;
 import com.teachub.common.exceptions.BadRequestException;
 import com.teachub.common.utils.CollUtils;
@@ -43,7 +43,7 @@ import java.util.stream.IntStream;
 @RequiredArgsConstructor
 @Slf4j
 public class LikedRecordServiceImpl extends ServiceImpl<LikedRecordMapper, LikedRecord> implements ILikedRecordService {
-    private final RabbitMqHelper rabbitMqHelper;
+    private final RocketMqHelper rocketMqHelper;
     private final StringRedisTemplate redisTemplate;
     //点赞或取消
     @Override
@@ -120,7 +120,7 @@ public class LikedRecordServiceImpl extends ServiceImpl<LikedRecordMapper, Liked
             return;
         }
         log.info("发送mq消息：{}",list);
-        String mqKey = StringUtils.format(MqConstants.Key.LIKED_TIMES_KEY_TEMPLATE,type);
-        rabbitMqHelper.send(MqConstants.Exchange.LIKE_RECORD_EXCHANGE,mqKey,list);
+        String mqKey = StringUtils.format(MqConstants.Tag.LIKED_TIMES_KEY_TEMPLATE,type);
+        rocketMqHelper.send(MqConstants.Topic.LIKE_RECORD_TOPIC,mqKey,list);
     }
 }

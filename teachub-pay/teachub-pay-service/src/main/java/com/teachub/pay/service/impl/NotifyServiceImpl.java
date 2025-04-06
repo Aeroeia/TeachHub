@@ -3,7 +3,7 @@ package com.teachub.pay.service.impl;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
 import com.alipay.easysdk.factory.Factory;
-import com.teachub.common.autoconfigure.mq.RabbitMqHelper;
+import com.teachub.common.autoconfigure.mq.RocketMqHelper;
 import com.teachub.common.autoconfigure.redisson.annotations.Lock;
 import com.teachub.common.constants.MqConstants;
 import com.teachub.common.exceptions.BadRequestException;
@@ -48,7 +48,7 @@ public class NotifyServiceImpl implements INotifyService {
     private final CertificatesManager certificatesManager;
     private final WxPayProperties properties;
     private final IPayOrderService payOrderService;
-    private final RabbitMqHelper rabbitMqHelper;
+    private final RocketMqHelper rocketMqHelper;
     private final IRefundOrderService refundOrderService;
 
     @Override
@@ -120,16 +120,13 @@ public class NotifyServiceImpl implements INotifyService {
         if (refundOrder == null) return;
 
         // 4.发送MQ通知业务端
-        rabbitMqHelper.send(
-                MqConstants.Exchange.PAY_EXCHANGE,
-                MqConstants.Key.REFUND_CHANGE,
+        rocketMqHelper.send(
+                MqConstants.Topic.PAY_TOPIC,
+                MqConstants.Tag.REFUND_CHANGE,
                 RefundResultDTO.builder()
-                        .status(status == RefundStatus.SUCCESS ? RefundResultDTO.SUCCESS : RefundResultDTO.FAILED)
-                        .bizPayOrderId(refundOrder.getBizOrderNo())
-                        .bizRefundOrderId(refundOrder.getBizRefundOrderNo())
-                        .refundChannel(refundOrder.getRefundChannel())
-                        .refundOrderNo(refundOrder.getRefundOrderNo())
-                        .msg(data.getStr("msg"))
+                        .refundOrderNo(refundOrder.getId())
+                        .refundStatus(status.getValue())
+                        .refundReason(refundOrder.getRefundReason())
                         .build()
         );
     }
