@@ -1,0 +1,2 @@
+dubboRelayUserFilter=com.teachub.authsdk.resource.filter.DubboRelayUserFilter
+dubboUserInfoFilter=com.teachub.authsdk.resource.filter.DubboUserInfoFilter
