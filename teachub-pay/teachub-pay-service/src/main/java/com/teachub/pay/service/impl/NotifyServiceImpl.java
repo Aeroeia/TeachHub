@@ -78,9 +78,9 @@ public class NotifyServiceImpl implements INotifyService {
         if (payOrder == null) return;
 
         // 5.通知业务服务
-        rabbitMqHelper.send(
-                MqConstants.Exchange.PAY_EXCHANGE,
-                MqConstants.Key.PAY_SUCCESS,
+        rocketMqHelper.send(
+                MqConstants.Topic.PAY_TOPIC,
+                MqConstants.Tag.PAY_SUCCESS,
                 PayResultDTO.builder()
                         .payChannel(payOrder.getPayChannelCode())
                         .payOrderNo(payOrder.getPayOrderNo())
@@ -124,9 +124,12 @@ public class NotifyServiceImpl implements INotifyService {
                 MqConstants.Topic.PAY_TOPIC,
                 MqConstants.Tag.REFUND_CHANGE,
                 RefundResultDTO.builder()
-                        .refundOrderNo(refundOrder.getId())
-                        .refundStatus(status.getValue())
-                        .refundReason(refundOrder.getRefundReason())
+                        .status(status == RefundStatus.SUCCESS ? RefundResultDTO.SUCCESS : RefundResultDTO.FAILED)
+                        .bizPayOrderId(refundOrder.getBizOrderNo())
+                        .bizRefundOrderId(refundOrder.getBizRefundOrderNo())
+                        .refundChannel(refundOrder.getRefundChannel())
+                        .refundOrderNo(refundOrder.getRefundOrderNo())
+                        .msg(data.getStr("msg"))
                         .build()
         );
     }
@@ -160,9 +163,9 @@ public class NotifyServiceImpl implements INotifyService {
         if (payOrder == null) return;
 
         // 5.通知业务服务
-        rabbitMqHelper.send(
-                MqConstants.Exchange.PAY_EXCHANGE,
-                MqConstants.Key.PAY_SUCCESS,
+        rocketMqHelper.send(
+                MqConstants.Topic.PAY_TOPIC,
+                MqConstants.Tag.PAY_SUCCESS,
                 PayResultDTO.builder()
                         .payOrderNo(payOrder.getPayOrderNo())
                         .payChannel(payOrder.getPayChannelCode())

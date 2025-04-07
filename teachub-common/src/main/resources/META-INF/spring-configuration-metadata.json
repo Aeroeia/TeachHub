@@ -87,37 +87,37 @@
     {
       "name": "teachub.mq.host",
       "type": "java.lang.String",
-      "description": "rabbitmq的地址",
+      "description": "rocketmq的地址",
       "defaultValue": "192.168.150.101"
     },
     {
       "name": "teachub.mq.port",
       "type": "java.lang.Integer",
-      "description": "rabbitmq的端口",
-      "defaultValue": "5672"
+      "description": "rocketmq的端口",
+      "defaultValue": "9876"
     },
     {
-      "name": "teachub.mq.vhost",
+      "name": "teachub.mq.group",
       "type": "java.lang.String",
-      "description": "rabbitmq的virtual-host地址",
-      "defaultValue": "/teachubxt"
+      "description": "rocketmq的group地址",
+      "defaultValue": "teachub_producer_group"
     },
     {
       "name": "teachub.mq.username",
       "type": "java.lang.String",
-      "description": "rabbitmq的用户名",
+      "description": "rocketmq的用户名",
       "defaultValue": "teachubxt"
     },
     {
       "name": "teachub.mq.password",
       "type": "java.lang.String",
-      "description": "rabbitmq的密码",
+      "description": "rocketmq的密码",
       "defaultValue": "123321"
     },
     {
       "name": "teachub.mq.listener.retry.enable",
       "type": "java.lang.Boolean",
-      "description": "是否开启rabbitmq的消费者重试机制",
+      "description": "是否开启rocketmq的消费者重试机制",
       "defaultValue": "true"
     },
     {

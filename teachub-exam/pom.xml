@@ -69,7 +69,7 @@
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-loadbalancer</artifactId>
         </dependency>
-        <!--rabbitMq-->
+        <!--rocketMq-->
         <dependency>
             <groupId>org.apache.rocketmq</groupId>
             <artifactId>rocketmq-spring-boot-starter</artifactId>
