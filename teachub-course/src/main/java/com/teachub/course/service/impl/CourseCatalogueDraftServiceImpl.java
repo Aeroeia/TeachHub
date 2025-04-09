@@ -33,6 +33,7 @@ import com.teachub.course.service.ICourseCatalogueDraftService;
 import com.teachub.course.service.ICourseCatalogueService;
 import com.teachub.course.service.ICourseDraftService;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -72,7 +73,7 @@ public class CourseCatalogueDraftServiceImpl extends ServiceImpl<CourseCatalogue
     @Autowired
     private CourseCatalogueDraftMapper courseCatalogueDraftMapper;
 
-    @Autowired
+    @DubboReference
     private ExamClient examClient;
 
     @Autowired

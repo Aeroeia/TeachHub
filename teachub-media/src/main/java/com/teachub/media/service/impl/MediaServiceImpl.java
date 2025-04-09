@@ -25,6 +25,7 @@ import com.teachub.media.mapper.MediaMapper;
 import com.teachub.media.service.IMediaService;
 import com.teachub.media.storage.IMediaStorage;
 import lombok.RequiredArgsConstructor;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,11 +48,14 @@ public class MediaServiceImpl extends ServiceImpl<MediaMapper, Media> implements
 
     private final IMediaStorage mediaStorage;
 
-    private final CourseClient courseClient;
+    @DubboReference
+    private CourseClient courseClient;
 
-    private final LearningClient learningClient;
+    @DubboReference
+    private LearningClient learningClient;
 
-    private final UserClient userClient;
+    @DubboReference
+    private UserClient userClient;
 
     @Override
     public String getUploadSignature() {

@@ -5,12 +5,18 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.teachub.api.cache.CategoryCache;
 import com.teachub.api.client.course.CategoryClient;
 import com.teachub.api.dto.course.CategoryBasicDTO;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
 import java.time.Duration;
 import java.util.Map;
 
+@Configuration
 public class CategoryCacheConfig {
+    @DubboReference
+    private CategoryClient categoryClient;
+
     /**
      * 课程分类的caffeine缓存
      */
@@ -27,7 +33,7 @@ public class CategoryCacheConfig {
      */
     @Bean
     public CategoryCache categoryCache(
-            Cache<String, Map<Long, CategoryBasicDTO>> categoryCaches, CategoryClient categoryClient){
+            Cache<String, Map<Long, CategoryBasicDTO>> categoryCaches){
         return new CategoryCache(categoryCaches, categoryClient);
     }
 }
