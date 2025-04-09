@@ -30,6 +30,7 @@ import com.teachub.trade.mapper.OrderMapper;
 import com.teachub.trade.mapper.RefundApplyMapper;
 import com.teachub.trade.service.IOrderDetailService;
 import lombok.RequiredArgsConstructor;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,11 +53,13 @@ import static com.teachub.trade.constants.TradeErrorInfo.ORDER_NOT_EXISTS;
 @RequiredArgsConstructor
 public class OrderDetailServiceImpl extends ServiceImpl<OrderDetailMapper, OrderDetail> implements IOrderDetailService {
 
-    private final UserClient userClient;
+    @DubboReference
+    private UserClient userClient;
 
     private final OrderMapper orderMapper;
 
-    private final PayClient payClient;
+    @DubboReference
+    private PayClient payClient;
 
     private final RefundApplyMapper applyMapper;
 

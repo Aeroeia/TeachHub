@@ -16,6 +16,7 @@ import com.teachub.search.repository.CourseRepository;
 import com.teachub.search.service.IInterestsService;
 import com.teachub.search.service.ISearchService;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.client.RequestOptions;
@@ -47,7 +48,7 @@ public class SearchServiceImpl implements ISearchService {
     @Autowired
     private IInterestsService interestsService;
 
-    @Autowired
+    @DubboReference
     private UserClient userClient;
 
     @Autowired

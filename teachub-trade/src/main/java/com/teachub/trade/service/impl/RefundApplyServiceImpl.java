@@ -38,6 +38,7 @@ import com.teachub.trade.mapper.RefundApplyMapper;
 import com.teachub.trade.service.IOrderDetailService;
 import com.teachub.trade.service.IRefundApplyService;
 import lombok.RequiredArgsConstructor;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -63,8 +64,10 @@ public class RefundApplyServiceImpl extends ServiceImpl<RefundApplyMapper, Refun
 
     private final OrderMapper orderMapper;
     private final IOrderDetailService detailService;
-    private final UserClient userClient;
-    private final PayClient payClient;
+    @DubboReference
+    private UserClient userClient;
+    @DubboReference
+    private PayClient payClient;
     private final RoleCache roleCache;
     private final ThreadPoolTaskExecutor sendRefundRequestExecutor;
     private final RocketMqHelper rocketMqHelper;
