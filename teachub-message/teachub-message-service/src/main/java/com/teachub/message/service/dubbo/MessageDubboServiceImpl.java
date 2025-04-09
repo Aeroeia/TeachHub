@@ -14,6 +14,11 @@ public class MessageDubboServiceImpl implements MessageClient {
 
     @Override
     public void sendMessage(SmsInfoDTO smsInfoDTO) {
-        smsService.sendMessageAsync(smsInfoDTO);
+        // convert com.teachub.message.domain.dto.SmsInfoDTO to com.teachub.api.dto.sms.SmsInfoDTO
+        com.teachub.api.dto.sms.SmsInfoDTO apiSmsInfoDTO = new com.teachub.api.dto.sms.SmsInfoDTO();
+        apiSmsInfoDTO.setTemplateCode(smsInfoDTO.getTemplateCode());
+        apiSmsInfoDTO.setPhones(smsInfoDTO.getPhones());
+        apiSmsInfoDTO.setTemplateParams(smsInfoDTO.getTemplateParams());
+        smsService.sendMessageAsync(apiSmsInfoDTO);
     }
 }

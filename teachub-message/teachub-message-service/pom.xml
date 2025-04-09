@@ -59,6 +59,11 @@
             <artifactId>teachub-message-domain</artifactId>
             <version>1.0.0</version>
         </dependency>
+        <dependency>
+            <groupId>com.teachub</groupId>
+            <artifactId>teachub-message-api</artifactId>
+            <version>1.0.0</version>
+        </dependency>
         <!--mq-->
         <dependency>
             <groupId>org.apache.rocketmq</groupId>
