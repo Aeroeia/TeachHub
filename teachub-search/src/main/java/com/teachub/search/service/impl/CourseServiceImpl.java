@@ -6,6 +6,7 @@ import com.teachub.common.utils.BeanUtils;
 import com.teachub.search.domain.po.Course;
 import com.teachub.search.repository.CourseRepository;
 import com.teachub.search.service.ICourseService;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -16,7 +17,7 @@ public class CourseServiceImpl implements ICourseService {
 
     @Resource
     private CourseRepository courseRepository;
-    @Resource
+    @DubboReference
     private CourseClient courseClient;
 
     @Override

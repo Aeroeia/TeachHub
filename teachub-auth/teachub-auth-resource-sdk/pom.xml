@@ -32,10 +32,5 @@
             <artifactId>teachub-auth-common</artifactId>
             <version>1.0.0</version>
         </dependency>
-        <dependency>
-            <groupId>io.github.openfeign</groupId>
-            <artifactId>feign-core</artifactId>
-            <scope>provided</scope>
-        </dependency>
     </dependencies>
 </project>

@@ -24,6 +24,7 @@ import com.teachub.trade.service.IOrderService;
 import com.teachub.trade.service.IPayService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -40,7 +41,8 @@ import static com.teachub.trade.constants.TradeErrorInfo.ORDER_NOT_EXISTS;
 @RequiredArgsConstructor
 public class PayServiceImpl implements IPayService {
 
-    private final PayClient payClient;
+    @DubboReference
+    private PayClient payClient;
     private final IOrderService orderService;
     private final IOrderDetailService detailService;
     private final TradeProperties tradeProperties;

@@ -28,8 +28,9 @@ import com.teachub.learning.enums.PlanStatus;
 import com.teachub.learning.mapper.LearningLessonMapper;
 import com.teachub.learning.service.ILearningLessonService;
 import com.teachub.learning.service.ILearningRecordService;
-import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -53,8 +54,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper, LearningLesson> implements ILearningLessonService {
-    private final CourseClient courseClient;
-    private final CatalogueClient catalogueClient;
+    @DubboReference
+    private CourseClient courseClient;
+    @DubboReference
+    private CatalogueClient catalogueClient;
     @Lazy
     @Autowired
     private ILearningRecordService learningRecordService;

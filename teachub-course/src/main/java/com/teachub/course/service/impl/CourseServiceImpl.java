@@ -35,6 +35,7 @@ import com.teachub.course.mapper.CourseDraftMapper;
 import com.teachub.course.mapper.CourseMapper;
 import com.teachub.course.mapper.CourseTeacherMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -78,16 +79,16 @@ public class CourseServiceImpl extends ServiceImpl<CourseMapper, Course> impleme
     @Autowired
     private ICategoryService categoryService;
 
-    @Autowired
+    @DubboReference
     private UserClient userClient;
 
-    @Autowired
+    @DubboReference
     private TradeClient tradeClient;
 
-    @Autowired
+    @DubboReference
     private ExamClient examClient;
 
-    @Autowired
+    @DubboReference
     private LearningClient learningClient;
 
     @Override

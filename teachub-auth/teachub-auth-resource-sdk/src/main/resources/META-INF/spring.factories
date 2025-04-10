@@ -1,3 +1,2 @@
 org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
-  com.teachub.authsdk.resource.config.ResourceInterceptorConfiguration, \
-  com.teachub.authsdk.resource.config.FeignRelayUserAutoConfiguration
+  com.teachub.authsdk.resource.config.ResourceInterceptorConfiguration

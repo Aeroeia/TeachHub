@@ -24,6 +24,7 @@ import com.teachub.user.mapper.UserMapper;
 import com.teachub.user.service.ICodeService;
 import com.teachub.user.service.IUserDetailService;
 import com.teachub.user.service.IUserService;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -48,7 +49,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     private PasswordEncoder passwordEncoder;
     @Autowired
     private ICodeService codeService;
-    @Autowired
+    @DubboReference
     private AuthClient authClient;
     @Autowired
     private IUserDetailService detailService;

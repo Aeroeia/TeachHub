@@ -18,6 +18,7 @@ import com.teachub.course.domain.vo.CataVO;
 import com.teachub.course.mapper.CourseCatalogueMapper;
 import com.teachub.course.properties.CourseProperties;
 import com.teachub.course.service.ICourseCatalogueService;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -38,7 +39,7 @@ public class CourseCatalogueServiceImpl extends ServiceImpl<CourseCatalogueMappe
     @Autowired
     private CourseProperties courseProperties;
 
-    @Autowired
+    @DubboReference
     private ExamClient examClient;
 
     @Override

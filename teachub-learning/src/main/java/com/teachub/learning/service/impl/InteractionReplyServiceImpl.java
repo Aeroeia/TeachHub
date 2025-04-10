@@ -20,6 +20,7 @@ import com.teachub.learning.mapper.InteractionReplyMapper;
 import com.teachub.learning.service.IInteractionQuestionService;
 import com.teachub.learning.service.IInteractionReplyService;
 import lombok.RequiredArgsConstructor;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -42,8 +43,10 @@ public class InteractionReplyServiceImpl extends ServiceImpl<InteractionReplyMap
     @Autowired
     @Lazy
     private IInteractionQuestionService interactionQuestionService;
-    private final UserClient userClient;
-    private final RemarkClient remarkClient;
+    @DubboReference
+    private UserClient userClient;
+    @DubboReference
+    private RemarkClient remarkClient;
 
     @Override
     @Transactional

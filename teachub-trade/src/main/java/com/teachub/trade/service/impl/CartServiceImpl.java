@@ -19,6 +19,7 @@ import com.teachub.trade.mapper.CartMapper;
 import com.teachub.trade.service.ICartService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -43,7 +44,8 @@ import static com.teachub.trade.constants.TradeErrorInfo.*;
 @RequiredArgsConstructor
 public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements ICartService {
 
-    private final CourseClient courseClient;
+    @DubboReference
+    private CourseClient courseClient;
     private final TradeProperties tradeProperties;
 
     @Override

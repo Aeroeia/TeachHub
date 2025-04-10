@@ -34,6 +34,7 @@ import com.teachub.trade.service.ICartService;
 import com.teachub.trade.service.IOrderDetailService;
 import com.teachub.trade.service.IOrderService;
 import lombok.RequiredArgsConstructor;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,12 +60,14 @@ import static com.teachub.trade.constants.TradeErrorInfo.ORDER_NOT_EXISTS;
 @RequiredArgsConstructor
 public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements IOrderService {
 
-    private final CourseClient courseClient;
+    @DubboReference
+    private CourseClient courseClient;
     private final IOrderDetailService detailService;
     private final ICartService cartService;
     private final TradeProperties tradeProperties;
     private final RocketMqHelper rocketMqHelper;
-    private final PromotionClient promotionClient;
+    @DubboReference
+    private PromotionClient promotionClient;
     @Override
     @Transactional
     public PlaceOrderResultVO placeOrder(PlaceOrderDTO placeOrderDTO) {

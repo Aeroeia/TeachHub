@@ -1,2 +1,2 @@
 org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
-  com.teachub.message.api.config.MessageClientConfiguration
+  com.teachub.message.api.config.MessageAutoConfiguration

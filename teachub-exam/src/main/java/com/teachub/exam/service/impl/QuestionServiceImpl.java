@@ -25,6 +25,7 @@ import com.teachub.exam.service.IQuestionBizService;
 import com.teachub.exam.service.IQuestionDetailService;
 import com.teachub.exam.service.IQuestionService;
 import lombok.RequiredArgsConstructor;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,7 +48,8 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
 
     private final IQuestionDetailService detailService;
     private final IQuestionBizService bizService;
-    private final UserClient userClient;
+    @DubboReference
+    private UserClient userClient;
     private final CategoryCache categoryCache;
 
     @Override

@@ -5,7 +5,6 @@ import com.teachub.common.domain.R;
 import com.teachub.common.exceptions.CommonException;
 import com.teachub.common.exceptions.DbException;
 import com.teachub.common.utils.WebUtils;
-import feign.FeignException;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
@@ -36,12 +35,6 @@ public class CommonExceptionAdvice {
         log.error("自定义异常 -> {} , 状态码：{}, 异常原因：{}  ",e.getClass().getName(), e.getStatus(), e.getMessage());
         log.debug("", e);
         return processResponse(e.getStatus(), e.getCode(), e.getMessage());
-    }
-
-    @ExceptionHandler(FeignException.class)
-    public Object handleFeignException(FeignException e) {
-        log.error("feign远程调用异常 -> ", e);
-        return processResponse(e.status(), e.status(), e.contentUTF8());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

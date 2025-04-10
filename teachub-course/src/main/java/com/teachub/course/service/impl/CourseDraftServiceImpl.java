@@ -34,6 +34,7 @@ import com.teachub.course.domain.vo.CoursePageVO;
 import com.teachub.course.domain.vo.CourseSaveVO;
 import com.teachub.course.domain.vo.NameExistVO;
 import io.seata.spring.annotation.GlobalTransactional;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -87,7 +88,7 @@ public class CourseDraftServiceImpl extends ServiceImpl<CourseDraftMapper, Cours
     @Autowired
     private CourseCataSubjectDraftMapper courseCataSubjectDraftMapper;
 
-    @Autowired
+    @DubboReference
     private UserClient userClient;
 
     @Autowired
@@ -96,13 +97,13 @@ public class CourseDraftServiceImpl extends ServiceImpl<CourseDraftMapper, Cours
     @Autowired
     private RocketMqHelper rocketMqHelper;
 
-    @Autowired
+    @DubboReference
     private TradeClient tradeClient;
 
-    @Autowired
+    @DubboReference
     private ExamClient examClient;
 
-    @Autowired
+    @DubboReference
     private LearningClient learningClient;
 
     @Override

@@ -17,6 +17,7 @@ import com.teachub.user.service.IStudentService;
 import com.teachub.user.service.IUserDetailService;
 import com.teachub.user.service.IUserService;
 import lombok.RequiredArgsConstructor;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,7 +40,8 @@ public class StudentServiceImpl implements IStudentService {
 
     private final IUserService userService;
     private final IUserDetailService detailService;
-    private final TradeClient tradeClient;
+    @DubboReference
+    private TradeClient tradeClient;
 
     @Override
     @Transactional

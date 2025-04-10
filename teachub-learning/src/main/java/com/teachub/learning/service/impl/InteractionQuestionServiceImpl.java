@@ -31,6 +31,7 @@ import com.teachub.learning.service.IInteractionQuestionService;
 import com.teachub.learning.service.IInteractionReplyService;
 import io.swagger.v3.oas.models.links.Link;
 import lombok.RequiredArgsConstructor;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -48,11 +49,15 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class InteractionQuestionServiceImpl extends ServiceImpl<InteractionQuestionMapper, InteractionQuestion> implements IInteractionQuestionService {
-    private final UserClient userClient;
+    @DubboReference
+    private UserClient userClient;
     private final IInteractionReplyService replyService;
-    private final SearchClient searchClient;
-    private final CourseClient courseClient;
-    private final CatalogueClient catalogueClient;
+    @DubboReference
+    private SearchClient searchClient;
+    @DubboReference
+    private CourseClient courseClient;
+    @DubboReference
+    private CatalogueClient catalogueClient;
     private final CategoryCache categoryCache;
     @Override
     public void addQuestion(QuestionFormDTO questionFormDTO) {

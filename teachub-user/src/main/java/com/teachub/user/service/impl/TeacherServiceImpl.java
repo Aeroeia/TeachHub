@@ -11,6 +11,7 @@ import com.teachub.user.domain.vo.TeacherPageVO;
 import com.teachub.common.enums.UserType;
 import com.teachub.user.service.ITeacherService;
 import com.teachub.user.service.IUserDetailService;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -31,7 +32,7 @@ import java.util.stream.Collectors;
 public class TeacherServiceImpl implements ITeacherService {
     @Autowired
     private IUserDetailService detailService;
-    @Autowired
+    @DubboReference
     private CourseClient courseClient;
 
     @Override

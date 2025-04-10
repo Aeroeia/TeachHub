@@ -23,6 +23,7 @@ import com.teachub.learning.service.ILearningRecordService;
 import com.teachub.learning.utils.LearningRecordDelayTaskHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,7 +46,8 @@ import java.util.stream.Collectors;
 @Slf4j
 public class LearningRecordServiceImpl extends ServiceImpl<LearningRecordMapper, LearningRecord> implements ILearningRecordService {
     private final ILearningLessonService learningLessonService;
-    private final CourseClient courseClient;
+    @DubboReference
+    private CourseClient courseClient;
     private final LearningRecordDelayTaskHandler learningRecordDelayTaskHandler;
 
     @Override
