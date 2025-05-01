@@ -1,716 +1,678 @@
-# TeachHub
+# 课表模块
 
-## 整体架构
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tianji-system.jpg)
-- 点赞 zset set
-- xxl-job配置使用
-- Interceptor顺序
-- xxl-job集群分片
-- xxl-job执行器 一个实例对应一个执行器 调度器分配
-- redis del和unlink区别 同步/异步 立即释放内存
-- 分表 动态表名
-- 任务链 存在bug
-- redis管道
-- 兑换码 BitMap
-- 异步生成兑换码 
-- 思考如何解决兑换码、优惠券过期清理问题
-- 乐观锁悲观锁 String.intern()
-- 事务失效 锁问题
-- 异步意义 削峰填谷
-- 领券优化 redis+异步
-- 防连点 交易服务preOrder
-- 点赞记录 冷热分离
-- 点赞数 --改hash
-- 优惠券推荐 初筛 细筛 排列组合
-- completableFuture 多线程
-## 一、我的课表模块开发 
+**LearningLessonController**
 
->Tips:在分布式系统中，使用数据库自增ID容易造成性能瓶颈和ID冲突，因为多个节点同时生成ID需要依赖数据库集中控制。而雪花算法（Snowflake）能在不同节点上本地高效、唯一地生成ID，避免分布式锁和数据库竞争问题，具有高可用、无中心、趋势递增等优点。因此，分布式系统推荐采用雪花算法而非默认的自增ID
----
-### 业务流程分析
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/drawio.png)
+由于课表中学习进度、学习时间、最近学习课程经常发生变更，还有排序的业务 而且每个用户需要单独存一份 所以不适合存入redis缓存
 
-#### 页面开发规则&接口设计
-- 未学习，已购买课程还未开始学习，可以开始学习
-- 已学习，已购买课程已开始学习，展示学习进度，可以继续学习
-- 已学完，已购买课程已经学完，可以重新学习
+| **编号** | **接口简述**                                    | **请求方式** | **请求路径**              |
+| :------- | :---------------------------------------------- | :----------- | :------------------------ |
+| 1        | 支付或报名课程后，立刻加入课表                  | MQ通知       |                           |
+| 2        | 分页查询我的课表                                | GET          | /lessons/page             |
+| 3        | 查询我最近正在学习的课程                        | GET          | /lessons/now              |
+| 4        | 根据id查询指定课程的学习状态                    | GET          | /lessons/{courseId}       |
+| 5        | 删除课表中的某课程                              | DELETE       | /lessons/{courseId}       |
+| 6        | 退款后，立刻移除课表中的课程                    | MQ通知       |                           |
+| 7        | 校验指定课程是否是课表中的有效课程（Feign接口） | GET          | /lessons/{courseId}/valid |
+| 8        | 统计课程学习人数（Feign接口）                   | GET          | /lessons/{courseId}/count |
 
-- 已失效，已购买课程已过期，不可继续学习，只能删除课程操作
+------
 
+## 支付/退款异步添加/删除课表
 
-综上设计出以下接口
-| 接口用途                               | 请求方式 | 请求路径                         | 备注说明                         |
-|----------------------------------------|----------|----------------------------------|----------------------------------|
-| 支付或报名课程后加入课表               | MQ通知   | -                                | 支付/报名后发送 MQ 消息，加入课表 |
-| 分页查询我的课表                       | GET      | /lessons/page                    | 支持分页查询                     |
-| 查询我最近正在学习的课程               | GET      | /lessons/now                     | 返回当前正在学习的课程           |
-| 根据 ID 查询指定课程的学习状态         | GET      | /lessons/{courseId}              | 获取某课程在课表中的学习状态     |
-| 删除课表中的某课程                     | DELETE   | /lessons/{courseId}              | 主动移除课表中某个课程           |
-| 退款后移除课表中的课程                 | MQ通知   | -                                | 退款成功后通过 MQ 移除课程       |
-| 校验指定课程是否是有效课表课程（Feign）| GET      | /lessons/{courseId}/valid        | Feign 接口，用于远程调用校验     |
-| 统计课程学习人数（Feign）              | GET      | /lessons/{courseId}/count        | Feign 接口，用于远程统计人数     |
-### 表结构设计
+- 消费者
 
-#### ER图
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/Unknown.png)
-#### 字段分析
-课表要记录的是用户的学习状态，所谓学习状态就是记录谁在学习哪个课程，学习的进度如何。
-- 其中，谁在学习哪个课程，就是一种关系。也就是说课表就是用户和课程的中间关系表。因此一定要包含三个字段：
-  - userId：用户id，也就是谁
-  - courseId：课程id，也就是学的课程
-  - id：唯一主键
-- 而学习进度，则是一些附加的功能字段，页面需要哪些功能就添加哪些字段即可：
-  - status：课程学习状态。0-未学习，1-学习中，2-已学完，3-已过期
-  ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/Unknown.png)
-  - planStatus：学习计划状态，0-没有计划，1-计划进行中
-  - weekFreq：计划的学习频率
-  ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/Unknown1.png)
-  - learnedSections：已学习小节数量，注意，课程总小节数、课程名称、封面等可由课程id查询得出，无需重复记录
-  ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/Unknown2.png)
-  - latestSectionId：最近一次学习的小节id，方便根据id查询最近学习的课程正在学第几节
-  ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/Unknown3.png)
-  - latestLearnTime：最近一次学习时间，用于分页查询的排序：
-  ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/Unknown4.png)
-  - createTime和expireTime，也就是课程加入时间和过期时间
-  ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/Unknown5.png)
----
-### 日志问题
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/aa3934c2-0a59-4d3f-8027-91f2127dd657.png)
-今天我在测试课程购买成功后通过mq异步将课程加入用户课程表时发现一个小问题，就是`当我将课程加入课程表后重复添加在控制台并没有输出错误消息`，我以为是我的数据库约束条件没做好，但我检查数据库发现数据并没有重复添加，而删除数据后发送请求是可以将数据成功加入到数据库的，这让我百思不得其解，不断更改日志级别还是没能将错误消息打印在控制台。最后我注意到控制台不断重复接收消息让我想到了`消费者重试机制`，这说明了程序肯定是报错了的，我检查mq后发现`error.queue`接收到了很多消息，里面正是我想要的报错`LearningLessonMapper.insert (batch index #1) failed. Cause: java.sql.BatchUpdateException: Duplicate entry '129-1549025085494521857' for key 'learning_lesson.idx_user_id'`
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/2d0762b3-9f7d-4634-b3d9-555d6c958e10.png)
-**原因：异常被Spring AMQP给捕获进行处理** 因此不是`ERROR`级别的错误，不会在控制台中爆红
+tj-learning进行消息监听，监听到消息后通过rpc调用course服务通过课程id查询课程信息并将课表信息加入learning数据库
+
+![image-20251015175954160](assets/image-20251015175954160.png)
+
+- 生产者
+
+  - 免费课程下单（在交易服务）成功后发送mq
+  - 支付宝/微信调用notify接口 验证参数后发送支付成功异步消息，交易服务接收到消息后发送mq让课表服务添加课程
+
+  - 退款操作：用户申请退款 管理员审批通过后发送异步(executor)请求给pay服务，pay服务返回成功结果后发送mq给课表服务进行课程删除
+
+------
+
+### 想法&流程
+
+- 支付/退款后异步同步课表
+- 如果消息丢失 用户手动添加到课表或者找客服
+
+------
+
+## 分页查询我的课表
+
+- rpc调用课表服务获取基本信息写入课表
+- 分页条件为页码、size、查询字段、是否升序
+
+![image-20251015203716844](assets/image-20251015203716844.png)
+
+### 想法&流程
+
+- 考虑到课表中学习进度、学习时间、最近学习课程经常发生变更，还有排序的业务 而且每个用户需要单独存一份 所以不适合存入redis缓存
+- 缓存命中率不高而且为每个用户维护缓存内存占用极大
+
+------
+
+## 创建学习计划
+
+![image-20251016181357663](assets/image-20251016181357663.png)没什么可说的 传入后直接修改数据库中数据就完事了
+
+------
+
+## 查询我的学习计划
+
+![image-20251016181821080](assets/image-20251016181821080.png)
+
+也没什么可说的 调个课程api获取课程信息 拼接一下返回就可以
+
+------
+
+# 学习计划和进度模块
+
+**LearningRecordController**
+
+整体流程如图：
+
+![image-20251018130753214](assets/image-20251018130753214.png)
+
+------
+
+## 查询学习记录
+
+![image-20251016180917693](assets/image-20251016180917693.png)
+
+**给课程服务rpc调用**
+
+![image-20251016192147510](assets/image-20251016192147510.png)
+
+![image-20251016185110864](assets/image-20251016185110864.png)
+
+- 获取当前登录用户id
+- 根据courseId和userId查询LearningLesson
+- 判断是否存在或者是否过期
+  - 如果不存在或过期直接返回空
+  - 如果存在并且未过期，则继续
+- 查询lesson对应的所有学习记录
+
+#### 优化
+
+**可以在返回数据的同时在Redis加入播放进度缓存 给下面提交学习记录使用**
+
+------
+
+## 提交学习记录	
+
+![image-20251016181529176](assets/image-20251016181529176.png)
+
+- 考试比较简单，只要提交了就说明这一节学完了。
+- 视频比较麻烦，需要记录用户的播放进度，进度超过50%才算学完。因此视频播放的过程中需要不断提交播放进度到服务端，而服务端则需要保存学习记录到数据库
+
+提交学习记录处理流程如图：
+
+![image-20251018130903666](assets/image-20251018130903666.png)
+
+------
+
+## 高并发优化学习记录提交
+
+![image-20251018131000600](assets/image-20251018131000600.png)
+
+变化最大的有两点：
+
+- 提交播放进度后，如果是更新播放进度则不写数据库，而是写缓存
+- 需要一个定时任务，定期将缓存数据写入数据库
+
+变化后的业务具体流程为：
+
+- 1.提交学习记录
+- 2.判断是否是考试
+  - 是：新增学习记录，并标记有小节被学完。走步骤8
+  - 否：走视频流程，步骤3
+- 3.查询播放记录缓存，如果缓存不存在则查询数据库并建立缓存
+- 4.判断记录是否存在 
+  - 4.1.否：新增一条学习记录
+  - 4.2.是：走更新学习记录流程，步骤5
+- 5.判断是否是第一次学完（进度超50%，旧的状态是未学完）
+  - 5.1.否：仅仅是要更新播放进度，因此直接写入Redis添加到延迟队列后结束
+    然后延迟队列不断取任务，线程池异步判断延迟队列中的值和缓存记录是否相等 相等则代表用户离开并写入数据库
+  - 5.2.是：代表小节学完，走步骤6
+- 6.更新学习记录状态为已学完
+- 7.清理Redis缓存：因为学习状态变为已学完，与缓存不一致，因此这里清理掉缓存，这样下次查询时自然会更新缓存，保证数据一致。
+- 8.更新课表中已学习小节的数量+1
+- 9.判断课程的小节是否全部学完
+  - 是：更新课表状态为已学完
+  - 否：结束
+
+### Redis中数据结构
+
+![image-20251017021142860](assets/image-20251017021142860.png)
+
+### 延迟队列进行优化
+
+![image-20251017023558715](assets/image-20251017023558715.png)
+
+**多实例也没问题 因为最多只会有一个实例中的延迟队列的新记录值和缓存中相等**
+
+------
+
+# 问答模块
+
+**InteractionQuestionController**
+**InteractionReplyController**
+
+![image-20251017102001709](assets/image-20251017102001709.png)
+
+------
+
+## 新增问题回答与查询问题回答
+
+**感觉可以做出以下优化：**
+
+- 使用本地锁+分布式锁组件+限流标识防短时间重复提交
+- 在redis维护一个hash表记录每个用户点过赞的评论（项目也确实是这样做的） 然后点赞数量也是维护一个hash表 新增问题、评论的操作就还是直接落库（加个ip限流防刷即可，一般并发不会高，主要是查询），查询时进行缓存即可
+
+### 想法&流程
+
+- 使用本地锁+分布式锁组件+限流标识防短时间重复提交
+- 新增问题/回答时进行数据库缓存双写（一般来说写操作不会很多 读占多数），异步写入缓存，使用Zset存id根据写入时间排序 两个Hash分别记录实体和评论数 
+- 读取的时直接根据zset的时间顺序读（天然分页） 然后在Hash中查找
+- ~~读取点赞数通过Redis的Hash~~，是否点赞通过Set 统计点赞数直接通过set获取
+- 根据回答时间进行清除冷门缓存 同时清除用户点赞记录
+
 ```java
-@Bean
-@ConditionalOnClass(MessageRecoverer.class)
-@ConditionalOnMissingBean
-public MessageRecoverer republishMessageRecoverer(RabbitTemplate rabbitTemplate){
-    // 消息处理失败后，发送到错误交换机：error.direct，RoutingKey默认是error.微服务名称
-    return new RepublishMessageRecoverer(
-            rabbitTemplate, ERROR_EXCHANGE, defaultErrorRoutingKey);
-}
+// 1. ZSet存储ID和时间（用于排序和分页）
+// question:replies:{questionId} -> replyId with timestamp as score
+redisTemplate.opsForZSet().add(replyListKey, replyId.toString(), System.currentTimeMillis());
+
+// 2. Hash存储实体详情
+// reply:info:{replyId} -> {id, content, userId, createTime, ...}
+Map<String, Object> replyInfo = new HashMap<>();
+replyInfo.put("id", reply.getId());
+replyInfo.put("content", reply.getContent());
+replyInfo.put("userId", reply.getUserId());
+// ... 其他字段
+redisTemplate.opsForHash().putAll(infoKey, replyInfo);
+
+// 3. 独立Hash存储统计信息
+// reply:stats:{replyId} -> {answerCount: 5, likeCount: 10}
+Map<String, String> stats = new HashMap<>();
+stats.put("answerCount", "5");
+stats.put("likeCount", "10");
+redisTemplate.opsForHash().putAll(statsKey, stats);
 ```
-当然了出现这个问题主要还是我在本地只启动了这一个微服务(其他服务跑在服务器上)，导致错误消息队列中消息没被消费，我使用try catch后确实把错误消息打印出来了，记录一下这个小小发现叭~
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/0ab6c810-0904-404b-a704-0620ea2855c3.png)
-## 二、学习计划和进度模块开发
-### 业务流程分析
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/a1.png)
-#### 接口设计
-1. 创建学习计划
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/1.1.png)
-2. 查询学习记录
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/1.2.png)
-3. 提交学习记录
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/1.3.png)
-4. 查询我的学习计划
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/1.4.png)
-#### 数据库设计
-数据表的设计要满足学习计划、学习进度的功能需求。学习计划信息在learning_lesson表中已经设计，因此我们关键是设计学习进度记录表即可。
 
-按照之前的分析，用户学习的课程包含多个小节，小节的类型包含两种：
-- 视频：视频播放进度超过50%就算当节学完
-- 考试：考完就算一节学完
-学习进度除了要记录哪些小节学完，还要记录学过的小节、每小节的播放的进度（方便续播）。因此，需要记录的数据就包含以下部分：
-- 学过的小节的基础信息
-  - 小节id
-  - 小节对应的lessonId
-  - 用户id：学习课程的人
-- 小节的播放进度信息
-  - 视频播放进度：也就是播放到了第几秒
-  - 是否已经学完：播放进度有没有超过50%
-  - 第一次学完的时间：用户可能重复学习，第一次从未学完到学完的时间要记录下来
+**方案二（不利于更新）**
 
-再加上一些表基础字段，整张表结构就出来了：
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/sql.png)
-### 循环依赖问题 
+- 使用本地锁+分布式锁组件+限流标识防短时间重复提交
+- 新增问题/回答时进行数据库缓存双写（一般来说写操作不会很多 读占多数），异步写入缓存，使用Zset根据写入时间排序member为消息实体  Hash分别记录实体和评论数
+- 读取的时直接根据zset的时间顺序读（天然分页） 评论数在Hash中读取
+- ~~读取点赞数通过Redis的Hash~~，是否点赞通过Set 统计点赞数直接通过set获取
+- 根据回答时间进行清除冷门缓存 同时清除用户点赞记录
+
 ```java
-@Service
-@RequiredArgsConstructor
-@Slf4j
-public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper, LearningLesson> implements ILearningLessonService {
-    private final ILearningRecordService learningRecordService;
-}
+// ZSet存储：member为JSON实体，score为时间戳
+// reply:list:{questionId} -> JSON serialized reply entity with timestamp as score
 
-
-@Service
-@RequiredArgsConstructor
-public class LearningRecordServiceImpl extends ServiceImpl<LearningRecordMapper, LearningRecord> implements ILearningRecordService {
-    private final ILearningLessonService learningLessonService;
-}
-
+// Hash存储：独立维护评论数量
+// reply:stats:{replyId} -> {commentCount: 5}
 ```
-会产生报错
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/304218eb-f79c-4e6c-8901-5ec72f1987c8.png)
 
-**解决方法：**
-1. 采用懒注入 @Lazy
+**最终流程**
+
+- 使用幂等锁防止短时间重复提交 防刷的话可以通过MD5标识+时间窗口进行计数
+- 还是直接根据数据库读写省事  优化的话可以考虑前面说的
+- 新增回答异步更新记录数 抛异常通过日志记录
+
+------
+
+## 管理端分页查询问题
+
+![image-20251228160012944](assets/image-20251228160012944.png)
+
+需要显示课程章节和课程分类、同时需要根句关键字模糊查找
+
+- Es模糊查找返回课程id
+
+- 课程章节是通过es返回的id查询课程后再查询目录得到的 进行了两次rpc
+
+- 构建所有分类的三级缓存 利用这个缓存进行拼接
+
+  **Caffeine**
+
+  ![image-20251018011135984](assets/image-20251018011135984.png)
+
+  **Redis**
+
+  这一块代码做的有点瑕疵 统计三级目录数量没有必要 其实只要返回课程包含的分类id拼接即可 所以只要在redis记录所有课程分类就行
+
+  ![image-20251018015442951](assets/image-20251018015442951.png)
+
+**优化点**
+
+![image-20251018131520737](assets/image-20251018131520737.png)
+
+- 课程信息可以进行hash缓存 缓存时间可以稍长 因为这个不怎么会进行改变
+- 目录、章节信息同上
+- 用户信息由于数据量比较庞大 不太适合全量存储 我想到的是将最近有所活动（发表问题、评论）的用户信息进行缓存
+
+### 想法&流程
+
+**后台进行缓存意义不大但大致流程可以这样**
+
+- 通过es查询出课程id（如果关键字存在）
+- 三级缓存分类信息 Redis使用多个Hash缓存 分别存 第一分类 id-name 多个第一分类id下的第二分类 id-name 三级分类同理
+- 三级缓存课程的基本信息（章节、分类、名字）结构为hash：课程id+信息
+- 通过缓存中的问答信息进行拼接返回
+
+**以下是我想到用户端查询课程的缓存**
+
+- 分别对课程介绍、目录进行三级缓存
+- 问答和笔记在其他模块都有对应的缓存了
+- 购买状态还是直接查数据库
+- 分类信息用hash id+信息（名字 层级 父分类id）持久缓存
+
+------
+
+# 点赞系统
+
+## 新增点赞/取消点赞
+
+![image-20251018155934209](assets/image-20251018155934209.png)
+
+需要统计点赞数再发送给mq是因为由于网络问题用户可能点了两次赞
+
+**改进**
+
+![image-20251018161532303](assets/image-20251018161532303.png)
+
+- 采用redis的set结构记录每个bizId下的点赞用户
+- 基于redis更新/查询点赞相关业务 并定期落库~~（或者我觉得可以点赞双写数据库和缓存，查询时查缓存）~~
+- 防止redis压力过大 冷门（长时间）数据从redis清除
+- 近期数据在redis访问不到自己是否点过赞则代表没有 冷门数据则进行数据库查询 **设置一个门槛时间（根据问题的时间）**
+
+**管道操作读取是否点赞**
+
+![image-20251018175327847](assets/image-20251018175327847.png)
+
+**Redis数据结构：Set**
+
+![image-20251018162718885](assets/image-20251018162718885.png)
+
+> 有同学会担心，如果点赞数据非常庞大，达到数百亿，那么该怎办呢？
+>
+> 大多数企业根本达不到这样的规模，如果真的达到也没有关系。这个时候我们可以将Redis与数据库结合。
+>
+> - 先利用Redis来记录点赞状态
+> - 并且定期的将Redis中的点赞状态持久化到数据库
+> - 对于历史点赞记录，比如下架的课程、或者超过2年以上的访问量较低的数据都可以从redis移除，只保留在数据库中
+> - 当某个记录点赞时，优先去Redis查询并判断，如果Redis中不存在，再去查询数据库数据并缓存到Redis
+
+------
+
+## 统计点赞数
+
+**Redis数据结构：Zset**
+
+![image-20251018162744523](assets/image-20251018162744523.png)
+
+> 如果是从节省内存角度来考虑，Hash结构无疑是最佳的选择；但是考虑到将来我们要从Redis读取点赞数，然后移除（避免重复处理）。为了保证线程安全，查询、移除操作必须具备原子性。而SortedSet则提供了几个移除并获取的功能，天生具备原子性。并且我们每隔一段时间就会将数据从Redis移除，并不会占用太多内存。因此，这里我们计划使用SortedSet结构。
+
+**点赞数落库**
+
+![image-20251018162821388](assets/image-20251018162821388.png)
+
+由于目前查询问答系统是基于数据库的 所以这种方案没什么问题 但其实也会有20秒延迟  
+
+### 想法&流程
+
+- 点赞时通过redis的Hash中进行统计 但要通过lua脚本或者加锁保证原子
+
+- 点赞记录通过mq异步发送落库
+
+  > 对比使用异步线程池好处：
+  >
+  > 1. 消费者可以根据自身能力进行消费 不用额外开辟线程去消费
+  > 2. 假设jvm宕机了 这条消息就丢失了 如果发送mq 还有其他jvm可以消费
+  > 3. mq有重试机制 
+
+- 定期清理redis中点赞记录 对于冷数据访问到没有再重新从数据库中加载
+
+------
+
+# 积分系统
+
+## 用户签到
+
+- 使用BitMap进行记录
+
+  - 确保Redis写入成功
+
+    ```java
+    Boolean result = redisTemplate.execute((RedisCallback<Boolean>) conn -> {
+        conn.setBit(key.getBytes(), day, true);
+        return true;
+    });
+    ```
+
+  - 主从复制使用半同步模式（避免主宕丢）,
+
+    > 等待至少 1 个从节点确认写入成功（等待最多 1 秒）。
+    >
+    > 这可以显著降低主从切换丢数据的概率。
+
+- MQ异步更新积分记录 
+
+  **防消息丢失、重复消费机制**
+
+  - 写记录表
+  - 同步等待发送成功（消息仍然可能丢 通过记录表补偿）
+  - 手动ack（消息处理失败可以发消息通知管理员）并在redis中记录一个唯一消息标识
+
+**可能重复消费原因**
+
+| 场景       | 造成重复消费的原因    | 解决方案             |
+| ---------- | --------------------- | -------------------- |
+| 消费前宕机 | 消费完成未提交 offset | 幂等消费设计         |
+| 生产端重试 | 网络抖动导致重复发送  | 开启 Kafka 幂等生产  |
+| 主从切换   | offset 回滚           | 同步副本配置 (`ISR`) |
+
+> 列的三类问题及解决思路：
+
+1. **Redis 主从切换丢数据**
+   - 可用 `AOF` + `appendfsync` 策略、`WAIT` 命令、`min-replicas-to-write`；或使用 Redis Raft / Redis Enterprise 提供强一致性；并在业务端做补偿（任务表/outbox）。
+2. **MQ 主从切换丢数据**
+   - Kafka：`acks=all` + `min.insync.replicas>=2` + `replication.factor>=3` + `unclean.leader.election=false`；启用 producer 幂等/事务。
+   - RabbitMQ：持久队列 + 持久消息 + Publisher Confirms + 使用 Quorum Queues。
+3. **消费者处理成功但 offset 未提交导致重复消费 / offset 延迟**
+   - 最常用：`enable.auto.commit=false` + 手动 commit（业务成功后） + 幂等处理（唯一约束或消费日志）。
+   - 更高级：Kafka 事务（sendOffsetsToTransaction）或将 offset 存 DB 并在同一 DB 事务内写业务数据与 offset（外部提交）。
+
+------
+
+# 排行榜
+
+![image-20251019031041927](assets/image-20251019031041927.png)
+
+## 实时排行榜
+
+> 实时排行榜是根据Redis中zset进行的 zset中key为用户id score是用户的积分 因此天然实现了排行榜排序 当用户积分变动时 比如用户签到获得了积分 则异步更新到zset榜中 结算时间是每月月底 这时候通过xxl-job定时任务并结合mybatisplus动态表名创建新表存入历史榜单数据 
+
+![image-20251019100719480](assets/image-20251019100719480.png)
+
+- 使用Zset进行积分排序
+- 新增积分记录同时修改Redis中Zset数据
+- 判断是否当前赛季并在Redis/Mysql进行分页查询
+
+## 历史排行榜
+
+- 分库分表
+
+  ![image-20251019113839460](assets/image-20251019113839460.png)
+
+- 定时任务每个赛季初生成上赛季榜单
+
+  - xxl-job创建新表
+  - 将上赛季信息保存到新表
+  - 清空redis缓存
+
+### 动态表名插件
+
 ```java
-@Lazy
-@Autowired
-private  ILearningRecordService learningRecordService;
-```
-2. 注入Mapper
-## 三、高并发优化
-### 流程分析
-播放进度记录业务较为复杂，但是我们认真思考一下整个业务分支：
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/learning.png)
-- 考试：每章只能考一次，还不能重复考试。因此属于低频行为，可以忽略
-- 视频进度：前端每隔15秒就提交一次请求。在一个视频播放的过程中，可能有数十次请求，但完播（进度超50%）的请求只会有一次。因此多数情况下都是更新一下播放进度即可。
-也就是说，95%的请求都是在更新`learning_record`表中的`moment`字段，以及`learning_lesson`表中的正在学习的小节id和时间。  
-而播放进度信息，不管更新多少次，下一次续播肯定是从最后的一次播放进度开始续播。也就是说我们只需要记住最后一次即可。因此可以采用合并写方案来降低数据库写的次数和频率，而异步写做不到。  
-综上，提交播放进度业务虽然看起来复杂，但大多数请求的处理很简单，就是更新播放进度。并且播放进度数据是可以合并的（覆盖之前旧数据）。我们建议采用合并写请求方案：
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/redis.png)
----
-### Redis数据结构设计
-这条业务支线的流程如下：
-- 查询播放记录，判断是否存在
-  - 如果不存在，新增一条记录
-  - 如果存在，则更新学习记录
-- 判断当前进度是否是第一次学完
-  - 播放进度要超过50%
-  - 原本的记录状态是未学完
-- 更新课表中最近学习小节id、学习时间
+package com.tianji.learning.config;
 
-这里有多次数据库操作，例如：
-- 查询播放记录：需要知道播放记录是否存在、播放记录当前的完成状态
-- 更新播放记录：更新播放进度
-- 更新最近学习小节id、时间
+import com.baomidou.mybatisplus.extension.plugins.handler.TableNameHandler;
+import com.baomidou.mybatisplus.extension.plugins.inner.DynamicTableNameInnerInterceptor;
+import com.tianji.learning.utils.TableInfoContext;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
-一方面我们要缓存写数据，减少写数据库频率；另一方面我们要缓存播放记录，减少查询数据库。因此，缓存中至少要包含3个字段：
-- 记录id：id，用于根据id更新数据库
-- 播放进度：moment，用于缓存播放进度
-- 播放状态（是否学完）：finished，用于判断是否是第一次学完
+import java.util.HashMap;
+import java.util.Map;
 
-既然一个课程包含多个小节，我们完全可以把一个课程的多个小节作为一个KEY来缓存
-
-**Redis结构设计如下**
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/efd41a70-e24b-43bd-b893-63d41757c5fd.png)
-这样做有两个好处：
-- 可以大大减少需要创建的KEY的数量，减少内存占用。
-- 一个课程创建一个缓存，当用户在多个视频间跳转时，整个缓存的有效期都会被延续，不会频繁的创建和销毁缓存数据
-
----
-### 持久化思路
-对于合并写请求方案，一定有一个步骤就是持久化缓存数据到数据库。一般采用的是定时任务持久化：
-但是定时任务的持久化方式在播放进度记录业务中存在一些问题，主要就是时效性问题。我们的产品要求视频续播的时间误差不能超过30秒。
-- 假如定时任务间隔较短，例如20秒一次，对数据库的更新频率太高，压力太大
-- 假如定时任务间隔较长，例如2分钟一次，更新频率较低，续播误差可能超过2分钟，不满足需求
-
-那么问题来了，有什么办法能够在不增加数据库压力的情况下，保证时间误差较低吗？
-
-假如一个视频时长为20分钟，我们从头播放至15分钟关闭，每隔15秒提交一次播放进度，大概需要提交60次请求。
-但是下一次我们再次打开该视频续播的时候，肯定是从最后一次提交的播放进度来续播。也就是说续播进度之前的N次播放进度都是没有意义的，都会被覆盖。
-既然如此，我们完全没有必要定期把这些播放进度写到数据库，只需要将用户最后一次提交的播放进度写入数据库即可。    
-
-但问题来了，我们怎么知道哪一次提交是最后一次提交呢？
->只要用户一直在提交记录，Redis中的播放进度就会一直变化。如果Redis中的播放进度不变，肯定是停止了播放，是最后一次提交。
-
-因此，我们只要能判断Redis中的播放进度是否变化即可。怎么判断呢？
-每当前端提交播放记录时，我们可以设置一个延迟任务并保存这次提交的进度。等待20秒后（因为前端每15秒提交一次，20秒就是等待下一次提交），检查Redis中的缓存的进度与任务中的进度是否一致。
-- 不一致：说明持续在提交，无需处理
-- 一致：说明是最后一次提交，更新学习记录、更新课表最近学习小节和时间到数据库中
-
-**流程如下**
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/op.png)
-#### 延迟队列配置
-**DelayTask**
-```java
-@Data
-public class DelayTask<D> implements Delayed {
-    private D data;
-    private long deadlineNanos;
-
-    public DelayTask(D data, Duration delayTime) {
-        this.data = data;
-        this.deadlineNanos = System.nanoTime() + delayTime.toNanos();
-    }
-
-    @Override
-    public long getDelay(TimeUnit unit) {
-        return unit.convert(Math.max(0, deadlineNanos - System.nanoTime()), TimeUnit.NANOSECONDS);
-    }
-
-    @Override
-    public int compareTo(Delayed o) {
-        long l = getDelay(TimeUnit.NANOSECONDS) - o.getDelay(TimeUnit.NANOSECONDS);
-        if(l > 0){
-            return 1;
-        }else if(l < 0){
-            return -1;
-        }else {
-            return 0;
-        }
-    }
-}
-```
-**延迟队列**
-```java
-private final DelayQueue<DelayTask<RecordTaskData>> queue = new DelayQueue<>();
-@Data
-    @NoArgsConstructor
-    private static class RecordCacheData {
-        private Long id;
-        private Integer moment;
-        private Boolean finished;
-
-        public RecordCacheData(LearningRecord record) {
-            this.id = record.getId();
-            this.moment = record.getMoment();
-            this.finished = record.getFinished();
-        }
-    }
-
-    @Data
-    @NoArgsConstructor
-    private static class RecordTaskData {
-        private Long lessonId;
-        private Long sectionId;
-        private Integer moment;
-
-        public RecordTaskData(LearningRecord record) {
-            this.lessonId = record.getLessonId();
-            this.sectionId = record.getSectionId();
-            this.moment = record.getMoment();
-        }
-    }
-```
-#### 多线程优化
-**线程池配置**
-```java
-static ThreadPoolExecutor poolExecutor = new ThreadPoolExecutor(
-        5,
-        16,
-        60,
-        TimeUnit.SECONDS,
-        new LinkedBlockingDeque<>(10)
-);
-```
-**多线程获取延迟队列任务**
-```java
-private void handleDelayTask() {
-
-    while(begin){
-        try {
-            // 1.尝试获取任务
-            log.info("尝试获取任务");
-            DelayTask<RecordTaskData> task = queue.take();
-            log.debug("获取到要处理的播放记录任务");
-            poolExecutor.submit(new Runnable() {
-                @Override
-                public void run() {
-                    // 2.读取Redis缓存
-                    RecordTaskData data = task.getData();
-                    LearningRecord record = readRecordCache(data.getLessonId(), data.getSectionId());
-                    if(record==null){
-                        return;
-                    }
-                    // 3.比较数据
-                    if (!Objects.equals(data.getMoment(), record.getMoment())) {
-                        // 4.如果不一致，播放进度在变化，无需持久化
-                        return;
-                    }
-                    // 5.如果一致，证明用户离开了视频，需要持久化
-                    // 5.1.更新学习记录
-                    record.setFinished(null);
-                    recordMapper.updateById(record);
-                    // 5.2.更新课表
-                    LearningLesson lesson = new LearningLesson();
-                    lesson.setId(data.getLessonId());
-                    lesson.setLatestSectionId(data.getSectionId());
-                    lesson.setLatestLearnTime(LocalDateTime.now());
-                    lessonService.updateById(lesson);
-
-                    log.debug("准备持久化学习记录信息");
-                }
-            });
-
-        } catch (Exception e) {
-            log.error("处理播放记录任务发生异常", e);
-        }
-    }
-
-}
-```
-## 四、问答系统开发
-### 产品原型
-#### 1.课程详情页
-在用户已经登录的情况下，如果用户购买了课程，在课程详情页可以看到一个互动问答的选项卡：
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/1280X1280.PNG)
-问答选项卡如下：
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/2.PNG)
-```
-1. 问答列表
-- 问答列表可以选择全部问题还是我的问题，选择我的问题则只展示我提问的问题。默认是全部
-- 选择章节序号，根据章节号查看章节下对应问答。默认展示所有章节的问题
-- 对于我提问的问题，可以做删除、修改操作
-2. 跳转逻辑
-- 点击提问按钮，进入问题编辑页面
-- 点击问题标题，进入问题详情页
-- 点击问题下的回答，进入回答表单
-```
-
-点击提问或编辑按钮会进入问题编辑页面：
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/3.png)
-```
-1. 表单内容
-- 课程：问题一定关联提问时所在的课程，无需选择
-- 章节：可以选择提问知识点对应的章节，也可以不选
-- 问题标题：一个概括性描述
-- 问题详情：详细问题信息，富文本
-- 是否匿名：用户可以选择匿名提问，其它用户不可见提问者信息
-```
-
-点击某个问题，则会进入问题详情页面：
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/4.png)
-```
-1. 页面内容
-- 顶部展示问题相关详细信息
-- 任何人都可以对问题做回复，也可以对他人的回答再次回复，无限叠楼。
-- 也没渲染只分两层：
-  - 对问题的一级回复，称为回答
-  - 对回答的回复、对回复的回复，作为第二级，称为评论
-- 问题详情页下面展示问题下的所有回答
-- 点击回答下的详情才展示二级评论
-- 可以对评论、回答点赞
-```
-#### 2.视频学习页
-另外，在视频学习页面中同样可以看到互动问答功能：
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/5.png)
-这个页面与课程详情页功能类似，只不过是在观看视频的过程中操作。用户产生学习疑问是可以快速提问，不用退回到课程详情页，用户体验较好。
-```
-1. 页面逻辑
-- 默认展示视频播放小节下的问答
-- 用户可以在这里提问问题，自动与当前课程、当前视频对应章节关联。其它参数与课程详情页的问题表单类似。
-- 问答列表默认只显示问题，点击后进入问题详情页才能查看具体答案
-```
-#### 3.管理端问答管理页
-除了用户端以外，管理端也可以管理互动问答，首先是一个列表页：
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/6.png)
-```
-1. 搜索
-- 管理员可以搜索用户提出的所有问题
-- 搜索结果可以基于页面过滤条件做过滤
-  - 问题状态：已查看、未查看两种。标示是否已经被管理员查看过。每当学员在问题下评论，状态重置为未查看
-  - 课程名称：由于问题是提问在课程下的，所以会跟课程关联。管理员输入课程名称，搜索该课程下的所有问题
-  - 提问时间：提出问题的时间
-
-2. 页面列表
-- 默认按照提问时间倒序排列；点击回答数量时可以根据回答数量排序
-- 课程分类：需要展示问题所属课程的三级分类的名称的拼接
-- 课程所属章节：如果是在视频页面提问，则问题会与视频对应的章、节关联，则此处显示章名称、节名称。
-- 课程名称：提问是针对某个课程的，因此此处显示对应的课程名称
-- 回答数量：该问题下的一级回复，称为回答。此处显示问题下的回答的数量，其它评论不统计。
-- 用户端状态：隐藏/显示。表示是否在用户端展示，对于一些敏感话题，管理员可以直接隐藏问题。
-
-3. 操作
-- 点击查看：会将该问题标记为已查看状态，并且跳转到问题详情页
-- 点击隐藏或显示：控制该问题是否在用户端显示。隐藏问题，则问题下的所有回答和恢复都被隐藏
-```
-点击查看按钮，会进入一个问题详情页面：
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/7.png)
-```
-1. 问题详情
-- 页面顶部是问题详情，展示信息与问题列表页基本一致
-- 点击评论，老师可以回答问题
-- 点击隐藏/显示，可以隐藏或显示问题
-2. 回答列表
-- 分页展示问题下的回答（一级回复）
-- 可以对回答点赞、评论、隐藏
-- 点击查看，则进入回答详情页
-```
-继续点击查看更多按钮，可以进入回答详情页：
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/8.png)
-```
-1. 回答详情
-- 页面顶部是回答详情，展示信息与回答列表页基本一致
-- 点击我来评论，老师可以评论该回答
-- 点击隐藏/显示，可以隐藏或显示该回答，该回答下的所有评论也都会被隐藏或显示
-2. 评论列表
-- 分页展示回答下的评论
-- 可以对评论点赞、回复、隐藏
-```
-### 接口设计
-| 编号 | 接口简述                              |
-|------|-------------------------------------|
-| **互动问题相关接口**                |                                     |
-| 1    | 新增互动问题                        |
-| 2    | 修改互动问题                        |
-| 3    | 分页查询问题（用户端）              |
-| 4    | 根据id查询问题详情（用户端）        |
-| 5    | 删除我的问题                        |
-| 6    | 分页查询问题（管理端）              |
-| 7    | 根据id查询问题详情（管理端）        |
-| 8    | 隐藏或显示指定问题（管理端）        |
-| **回答及评论相关接口**              |                                     |
-| 1    | 新增回答或评论                      |
-| 2    | 分页查询回答或评论列表              |
-| 4    | 隐藏或显示指定回答或评论（管理端）  |
----
-### ER图
-#### 1.问题的ER图
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/whiteboard_exported_image-3.png)
-#### 2..回答、评论的ER图
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/whiteboard_exported_image-2.png)
-
-### 管理端分页查询问题
-#### Es使用
-**ip配置**
-**引入依赖**
-```xml
-<properties>
-  <elasticsearch.version>7.12.1</elasticsearch.version>
-<properties>
-
-<dependency>
-    <groupId>org.elasticsearch.client</groupId>
-    <artifactId>elasticsearch-rest-high-level-client</artifactId>
-</dependency>
-```
-```yaml
-elasticsearch:
-  uris: http://192.168.150.101:9200
-```
-**根据课程名查询课程id**
-```java
-@Autowired
-private RestHighLevelClient restClient;
-
-@Override
-public List<Long> queryCoursesIdByName(String keyword) {
-    // 1.创建Request
-    SearchRequest request = new SearchRequest(CourseRepository.INDEX_NAME);
-    // 2.构建DSL
-    request.source()
-            .query(QueryBuilders.matchPhraseQuery(CourseRepository.DEFAULT_QUERY_NAME, keyword))
-            .fetchSource(new String[]{"id"}, null);
-    // 3.查询
-    SearchResponse response;
-    try {
-        response = restClient.search(request, RequestOptions.DEFAULT);
-    } catch (IOException e) {
-        throw new CommonException(SearchErrorInfo.QUERY_COURSE_ERROR, e);
-    }
-    // 4.解析
-    SearchHits searchHits = response.getHits();
-    // 4.1.获取hits
-    SearchHit[] hits = searchHits.getHits();
-    if (hits.length == 0) {
-        return CollUtils.emptyList();
-    }
-    // 4.2.获取id
-    return Arrays.stream(hits)
-            .map(SearchHit::getId)
-            .map(Long::valueOf)
-            .collect(Collectors.toList());
-}
-```
-#### 三级缓存
-在管理端分页查询问题的时候，需要查询课程的分类信息，而课程的分类有三级
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/cata.png)
-每一个课程都与第三级分类关联，因此向上级追溯，也有对应的二级、一级分类。在课程微服务提供的查询课程的接口中，可以看到返回的课程信息中就包含了关联的一级、二级、三级分类。因此，只要我们查询到了问题所属的课程，就能知道课程关联的三级分类id。  
-这里有一个值得思考的点：课程分类数据在很多业务中都需要查询，这样的数据如此频繁的查询，就需要用到缓存来提高性能
-
-像这样的数据，除了建立Redis缓存以外，还非常适合做本地缓存（Local Cache）。这样就可以形成多级缓存机制：
-- 数据查询时优先查询本地缓存
-- 本地缓存不存在，再查询Redis缓存
-- Redis不存在，再去查询数据库。
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/whiteboard_exported_image.png)
-#### Caffeine
-**配置**
-```java
 @Configuration
-public class CategoryCacheConfig {
-    /**
-     * 课程分类的caffeine缓存
-     */
+public class MybatisConfiguration {
+
     @Bean
-    public Cache<String, Map<Long, CategoryBasicDTO>> categoryCaches(){
-        return Caffeine.newBuilder()
-                .initialCapacity(1) // 容量限制
-                .maximumSize(10_000) // 最大内存限制
-                .expireAfterWrite(Duration.ofMinutes(30)) // 有效期
-                .build();
-    }
-    /**
-     * 课程分类的缓存工具类
-     */
-    @Bean
-    public CategoryCache categoryCache(
-            Cache<String, Map<Long, CategoryBasicDTO>> categoryCaches, CategoryClient categoryClient){
-        return new CategoryCache(categoryCaches, categoryClient);
+    public DynamicTableNameInnerInterceptor dynamicTableNameInnerInterceptor() {
+        // 准备一个Map，用于存储TableNameHandler
+        Map<String, TableNameHandler> map = new HashMap<>(1);
+        // 存入一个TableNameHandler，用来替换points_board表名称
+        // 替换方式，就是从TableInfoContext中读取保存好的动态表名
+        map.put("points_board", (sql, tableName) -> TableInfoContext.getInfo() == null ? tableName : TableInfoContext.getInfo());
+        return new DynamicTableNameInnerInterceptor(map);
     }
 }
 ```
-**缓存结果**
+
+- 在Mybatis-plus配置类中进行配置
+- 使用ThreeadLocal传递表名
+
+### XXL-JOB任务分片
+
+- 通过集群分片处理任务
+  - 确保每个实例任务处理不重复
+  - 两实例同时写入Mysql在Mysql没达到瓶颈的时候会更快
+  - 如果redis分片也能提高速度
+
 ```java
-    public Map<Long, CategoryBasicDTO> getCategoryMap() {
-        return categoryCaches.get(Constant.CAFFEINE_CACHE_NAME, key -> {
-            // 1.从CategoryClient查询
-            List<CategoryBasicDTO> list = categoryClient.getAllOfOneLevel();
-            if (list == null || list.isEmpty()) {
-                return CollUtils.emptyMap();
-            }
-            // 2.转换数据
-            return list.stream().collect(Collectors.toMap(CategoryBasicDTO::getId, Function.identity()));
+@XxlJob("savePointsBoard2DB")
+public void savePointsBoard2DB(){
+    // 1.获取上月时间
+    LocalDateTime time = LocalDateTime.now().minusMonths(1);
+
+    // 2.计算动态表名
+    // 2.1.查询赛季信息
+    Integer season = seasonService.querySeasonByTime(time);
+    // 2.2.存入ThreadLocal
+    TableInfoContext.setInfo(POINTS_BOARD_TABLE_PREFIX + season);
+
+    // 3.查询榜单数据
+    // 3.1.拼接KEY
+    String key = RedisConstants.POINTS_BOARD_KEY_PREFIX + time.format(DateUtils.POINTS_BOARD_SUFFIX_FORMATTER);
+    // 3.2.查询数据
+    int index = XxlJobHelper.getShardIndex();
+    int total = XxlJobHelper.getShardTotal();
+    int pageNo = index + 1; // 起始页，就是分片序号+1
+    int pageSize = 10;
+    while (true) {
+        List<PointsBoard> boardList = pointsBoardService.queryCurrentBoardList(key, pageNo, pageSize);
+        if (CollUtils.isEmpty(boardList)) {
+            break;
+        }
+        // 4.持久化到数据库
+        // 4.1.把排名信息写入id
+        boardList.forEach(b -> {
+            b.setId(b.getRank().longValue());
+            b.setRank(null);
         });
+        // 4.2.持久化
+        pointsBoardService.saveBatch(boardList);
+        // 5.翻页，跳过N个页，N就是分片数量
+        pageNo+=total;
     }
 
-    public String getCategoryNames(List<Long> ids) {
-        if (ids == null || ids.size() == 0) {
-            return "";
-        }
-        // 1.读取分类缓存
-        Map<Long, CategoryBasicDTO> map = getCategoryMap();
-        // 2.根据id查询分类名称并组装
-        StringBuilder sb = new StringBuilder();
-        for (Long id : ids) {
-            sb.append(map.get(id).getName()).append("/");
-        }
-        // 3.返回结果
-        return sb.deleteCharAt(sb.length() - 1).toString();
-    }
+    TableInfoContext.remove();
+}
 ```
-## 五、点赞系统
-### 业务流程
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-remark/whiteboard_exported_image.png)
-该业务可以采用以下思路进行实现:
-1. 用户点赞后查询Redis是否存在该用户点赞记录(set)，若存在则直接返回，不存在则在redis新增点赞记录(zset)，采用定时任务，定期将数据通过mq发送到对应业务微服务更新点赞数量，同时清除zset中的数据  
-2. 查询用户是否点赞远程微服务通过feign接口调用remark服务，使用redis管道连接功能提高遍历效率
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-remark/redisopt.png)
-### ER图
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-remark/whiteboard_exported_image-2.png)
-### Mq问题
-我在调试用户点赞后更新远程微服务点赞数量的时候出现了以下报错
-```
-message_id:	121fc91d-0753-49c9-8da8-3a15aa91b5ce
-priority:	0
-delivery_mode:	2
-headers:	
-__ContentTypeId__:	java.lang.Object
-__TypeId__:	java.util.ArrayList
-requestId:	dfce9a6002c544499792d8e5c1e453bd
-x-exception-message:	Failed to convert Message content
-x-exception-stacktrace:	org.springframework.amqp.rabbit.support.ListenerExecutionFailedException: Failed to convert message
-at org.springframework.amqp.rabbit.listener.adapter.MessagingMessageListenerAdapter.onMessage(MessagingMessageListenerAdapter.java:156)
-at org.springframework.amqp.rabbit.listener.AbstractMessageListenerContainer.doInvokeListener(AbstractMessageListenerContainer.java:1670)
-at org.springframework.amqp.rabbit.listener.AbstractMessageListenerContainer.actualInvokeListener(AbstractMessageListenerContainer.java:1589)
-at jdk.internal.reflect.GeneratedMethodAccessor197.invoke(Unknown Source)
-at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(Unknown Source)
-at java.base/java.lang.reflect.Method.invoke(Unknown Source)
-at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:344)
-at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:198)
-at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:163)
-at org.springframework.retry.interceptor.RetryOperationsInterceptor$1.doWithRetry(RetryOperationsInterceptor.java:97)
-at org.springframework.retry.support.RetryTemplate.doExecute(RetryTemplate.java:329)
-at org.springframework.retry.support.RetryTemplate.execute(RetryTemplate.java:225)
-at org.springframework.retry.interceptor.RetryOperationsInterceptor.invoke(RetryOperationsInterceptor.java:122)
-at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:186)
-at org.springframework.aop.framework.JdkDynamicAopProxy.invoke(JdkDynamicAopProxy.java:215)
-at org.springframework.amqp.rabbit.listener.$Proxy204.invokeListener(Unknown Source)
-at org.springframework.amqp.rabbit.listener.AbstractMessageListenerContainer.invokeListener(AbstractMessageListenerContainer.java:1577)
-at org.springframework.amqp.rabbit.listener.AbstractMessageListenerContainer.doExecuteListener(AbstractMessageListenerContainer.java:1568)
-at org.springframework.amqp.rabbit.listener.AbstractMessageListenerContainer.executeListener(AbstractMessageListenerContainer.java:1512)
-at org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer.doReceiveAndExecute(SimpleMessageListenerContainer.java:993)
-at org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer.receiveAndExecute(SimpleMessageListenerContainer.java:940)
-at org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer.access$1600(SimpleMessageListenerContainer.java:84)
-at org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer$AsyncMessageProcessingConsumer.mainLoop(SimpleMessageListenerContainer.java:1317)
-at org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer$AsyncMessageProcessingConsumer.run(SimpleMessageListenerContainer.java:1223)
-at java.base/java.lang.Thread.run(Unknown Source)
-Caused by: org.springframework.amqp.support.converter.MessageConversionException: Failed to convert Message content
-at org.springframework.amqp.support.converter.AbstractJackson2MessageConverter.doFromMessage(AbstractJackson2MessageConverter.java:350)
-at org.springframework.amqp.support.converter.AbstractJackson2MessageConverter.fromMessage(AbstractJackson2MessageConverter.java:309)
-at org.springframework.amqp.support.converter.AbstractJackson2MessageConverter.fromMessage(AbstractJackson2MessageConverter.java:292)
-at org.springframework.amqp.rabbit.listener.adapter.AbstractAdaptableMessageListener.extractMessage(AbstractAdaptableMessageListener.java:342)
-at org.springframework.amqp.rabbit.listener.adapter.MessagingMessageListenerAdapter$MessagingMessageConverterAdapter.extractPayload(MessagingMessageListenerAdapter.java:366)
-at org.springframework.amqp.support.converter.MessagingMessageConverter.fromMessage(MessagingMessageConverter.java:132)
-at org.springframework.amqp.rabbit.listener.adapter.MessagingMessageListenerAdapter.toMessagingMessage(MessagingMessageListenerAdapter.java:243)
-at org.springframework.amqp.rabbit.listener.adapter.MessagingMessageListenerAdapter.onMessage(MessagingMessageListenerAdapter.java:146)
-... 24 more
-Caused by: com.fasterxml.jackson.databind.exc.MismatchedInputException: Cannot deserialize value of type `com.tianji.api.dto.remark.LikedTimesDTO` from Array value (token `JsonToken.START_ARRAY`)
-at [Source: (String)"[{"bizId":"1588103282121805825","likedTimes":1}]"; line: 1, column: 1]
-at com.fasterxml.jackson.databind.exc.MismatchedInputException.from(MismatchedInputException.java:59)
-at com.fasterxml.jackson.databind.DeserializationContext.reportInputMismatch(DeserializationContext.java:1741)
-at com.fasterxml.jackson.databind.DeserializationContext.handleUnexpectedToken(DeserializationContext.java:1515)
-at com.fasterxml.jackson.databind.DeserializationContext.handleUnexpectedToken(DeserializationContext.java:1462)
-at com.fasterxml.jackson.databind.deser.BeanDeserializer._deserializeFromArray(BeanDeserializer.java:638)
-at com.fasterxml.jackson.databind.deser.BeanDeserializer._deserializeOther(BeanDeserializer.java:210)
-at com.fasterxml.jackson.databind.deser.BeanDeserializer.deserialize(BeanDeserializer.java:186)
-at com.fasterxml.jackson.databind.deser.DefaultDeserializationContext.readRootValue(DefaultDeserializationContext.java:323)
-at com.fasterxml.jackson.databind.ObjectMapper._readMapAndClose(ObjectMapper.java:4674)
-at com.fasterxml.jackson.databind.ObjectMapper.readValue(ObjectMapper.java:3629)
-at org.springframework.amqp.support.converter.AbstractJackson2MessageConverter.convertBytesToObject(AbstractJackson2MessageConverter.java:411)
-at org.springframework.amqp.support.converter.AbstractJackson2MessageConverter.convertContent(AbstractJackson2MessageConverter.java:378)
-at org.springframework.amqp.support.converter.AbstractJackson2MessageConverter.doFromMessage(AbstractJackson2MessageConverter.java:347)
-... 31 more
-x-original-exchange:	like.record.topic
-x-original-routingKey:	QA.times.changed
-```
-调试的时候我发现一个很奇异的现象：发送MQ请求无法更新点赞数量，但是偶然又能成功更新数据库，让我百思不得其解  
-起初我查看error消息队列有新增异常的时候返回来看idea控制台learning服务并没有打印任何东西，我以为类型转换错误不会打印消息会直接走`MessageRecoverer`，思来想去半个多小时突然想到**MQ好像不依赖nacos**，所以出现这个问题的原因是我本地写的代码没有推送到服务器上更新服务器上的服务，**即使我在nacos让服务下线，但该服务的MQ还是能正常进行消费**，这也解释了为什么前面偶然能成功更新而有时候又不行，是因为部分走了服务器上的消费者而部分走了本地服务  
-*我还一直以为是我序列化有问题🤦 记录一下这半个多小时的折腾吧哈哈*
-## 六、积分系统
-### 接口设计
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day07/1.png)
-### 数据库ER图
-#### 签到记录
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day07/whiteboard_exported_image.png)
-#### 积分记录
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day07/whiteboard_exported_image-2.png)
-#### 排行榜
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day07/whiteboard_exported_image-3.png)
-### 签到功能实现--BitMap
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day07/sign.png)
-我们知道二进制是计算机底层最基础的存储方式了，其中的每一位数字就是计算机信息量的最小单位了，称之为bit，一个月最多也就 31 天，因此一个月的签到记录最多也就使用 31 bit 就能保存了，还不到 4 个字节。
-而如果用到我们前面讲的数据库方式来保存相同数据，则要使用数百字节，是这种方式的上百倍都不止。
-可见，这种用二进制位保存签到记录的方式，是不是非常高效啊！
 
-像这种把每一个二进制位，与某些业务数据一一映射（本例中是与一个月的每一天映射），然后用二进制位上的数字0和1来标识业务状态的思路，称为位图。也叫做BitMap.
+- 利用XXL-JOB的任务链执行
 
-这种数据统计的方式非常节省空间，因此经常用来做各种数据统计。比如大名鼎鼎的布隆过滤器就是基于BitMap来实现的。
+  ![image-20251019120633730](assets/image-20251019120633730.png)
 
-OK，那么利用BitMap我们就能直接实现签到功能，并且非常节省内存，还很高效。所以就无需通过数据库来操作了。
->BitMap用法合集:https://redis.io/docs/latest/commands/ 
+------
 
-**BitMap基本用法**
-```java
- @Autowired
-    private StringRedisTemplate redisTemplate;
-    @Test
-    //bitset
-    void bitSet(){
-        Boolean b = redisTemplate.opsForValue().setBit("test", 1, true);
-        System.out.println(b);
-    }
+# 优惠券管理
 
-    @Test
-    //bitget
-    void bitGet(){
-        //返回bitfield集合
-        List<Long> longs = redisTemplate.opsForValue().bitField("test",
-                BitFieldSubCommands.create().get(BitFieldSubCommands.
-                //获取位数
-                BitFieldType.unsigned(3))
-                //从0索引开始
-                .valueAt(0));
-        Long l = longs.get(0);
-        System.out.println(Long.toBinaryString(l));
-    }
-```
->Redis最基础的数据类型只有5种：String、List、Set、SortedSet、Hash，其它特殊数据结构大多都是基于以上5这种数据类型。
-BitMap也不例外，它是基于String结构的。因为Redis的String类型底层是SDS，也会存在一个字节数组用来保存数据。而Redis就提供了几个按位操作这个数组中数据的命令，实现了BitMap效果。  
-由于String类型的最大空间是512MB，也就是2的31次幂个bit，因此可以保存的数据量级是十分恐怖的
----
-### 积分功能
-由积分规则可知，获取积分的行为多种多样，而且每一种行为都有自己的独立业务。而这些行为产生的时候需要保存一条积分明细到数据库。
-我们显然不能要求其它业务的开发者在开发时帮我们新增一条积分记录，这样会导致原有业务与积分业务耦合。因此必须采用异步方式，将原有业务与积分业务解耦。
-如果有必要，甚至可以将积分业务抽离，作为独立微服务。
+## 发放优惠券
 
-**该业务我们使用MQ进行解耦**
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day07/whiteboard_exported_image-4.png)
-## 七、排行榜
-这个模块主要涉及两个功能的实现
-1. 实时排行榜
-实时榜需要快速获得
-2. 历史排行榜
+- 立即发放
 
+  - 检查当前状态是否为待发放
 
-###  实时排行榜
+  - 优惠券信息存入Redis
+
+    ![image-20251019170205419](assets/image-20251019170205419.png)
+
+  - 判断是否兑换码兑换
+
+- 定时发放
+
+  - 检查当前状态是否为待发放
+  - 判断是否兑换码兑换
+  - 定时任务每120s检查一次 将到期发放的优惠券状态设为发放中
+
+## 兑换码生成
+
+> 兑换码生成是采用了Base32和签名的一种思想 项目中使用32位的一个自增id 并将这32位数分为8组 每组4位 并为每组设置一个权重 进行加权求和得到的结果就是签名 这个结果是一个14位的数字 这个权重数组则是密钥 同时为了避免被猜出规律 项目中准备了16组密钥 在32位自增id前拼接4位的随机值 值是多少就取第几组密钥 最终进行拼接 得到50位的数据 通过Base32编码得到10位字符
+
+> **要求**
+>
+> - **可读性好**：兑换码是要给用户使用的，用户需要输入兑换码，因此可读性必须好。我们的要求：
+>   - 长度不超过10个字符
+>   - 只能是24个大写字母和8个数字：ABCDEFGHJKLMNPQRSTUVWXYZ23456789
+> - **数据量大**：优惠活动比较频繁，必须有充足的兑换码，最好有10亿以上的量
+> - **唯一性**：10亿兑换码都必须唯一，不能重复，否则会出现兑换混乱的情况
+> - **不可重兑**：兑换码必须便于校验兑换状态，避免重复兑换
+> - **防止爆刷**：兑换码的规律性不能很明显，不能轻易被人猜测到其它兑换码
+> - **高效**：兑换码生成、验证的算法必须保证效率，避免对数据库带来较大的压力
+
+- Base32转码
+
+  - ![image-20251019180151450](assets/image-20251019180151450.png)
+
+  - > 但是大家思考一下，我们最终要求字符不能超过10位，而每个字符对应5个bit位，因此二进制数不能超过50个bit位。
+    >
+    > UUID和Snowflake算法得到的结果，一个是128位，一个是64位，都远远超出了我们的要求。
+    >
+    > 那自增id算法符合我们的需求呢？
+    >
+    > 自增id从1增加到Integer的最大值，可以达到40亿以上个数字，而占用的字节仅仅4个字节，也就是32个bit位，距离50个bit位的限制还有很大的剩余，符合要求！
+
+- 重兑校验算法
+
+  - 基于BitMap：兑换或没兑换就是两个状态，对应0和1，而兑换码使用的是自增id.我们如果每一个自增id对应一个bit位，用每一个bit位的状态表示兑换状态
+
+- 防刷校验算法
+
+  - ![image-20251019181718298](assets/image-20251019181718298.png)
+  - 准备16组秘钥。在兑换码自增id前拼接一个4位的**新鲜值**，可以是随机的。这个值是多少，就取第几组秘钥
+  - 最终![image-20251019182013518](assets/image-20251019182013518.png)
+
+  
+
+### 算法实现
+
+![image-20251019172753248](assets/image-20251019172753248.png)
+
+- 异步生成兑换码
+
+- 将每张兑换码发放最大值记录到Redis中作为序列化自增最大值
+
+- 从begin- maxNum进行序列号递增新增兑换码
+
+- 计算兑换码
+
+  - 根据id%密钥表作为新鲜值
+
+    ![image-20251019184903762](assets/image-20251019184903762.png)
+
+  - freshID<<32 ｜ 自增序列号
+
+    ![image-20251019184909234](assets/image-20251019184909234.png)
+
+  - 不断取最右边4位进行计算 新鲜值4位+序列号32位共计算9次
+
+    ![image-20251019184933864](assets/image-20251019184933864.png)
+
+  - 异或混淆数据
+
+    ![image-20251019185135845](assets/image-20251019185135845.png)
+
+  - 拼接计算好的密钥值
+
+    ![image-20251019185222997](assets/image-20251019185222997.png)
+
+- 将生成好的兑换码存到数据库中
+
+- 在Redis中存每个优惠券最大序列号
+
+------
+
+# 领取优惠券
+
+## 分页查询优惠券
+
+**改造**
+
+> 发放优惠券同时在Redis进行缓存 基于Redis进行判断即可
+
+- Redis中采用Hash记录一个用户领取过的优惠券和次数或者用String的自增
+- 通过Redis中将优惠券存储分为手动领取和兑换码兑换两种key
+- 通过Redis进行优惠券查询并进行后续判断
+
+------
+
+## 领取优惠券
+
+> 项目中分为直接领取优惠券和兑换码兑换优惠券
+>
+> 兑换码兑换基于BitMap和Hash进行的 BitMap通过自增id作为兑换码的序列号 同时一个Hash用于记录优惠券的兑换码id范围 兑换的时候先解析出序列号id 然后检查是否在兑换范围呢 并通过BitMap检查是否超出范围 
+>
+> 通过MQ异步扣减数据库（削峰填谷）在Redis和Mysql分别加入记录对账
+> 如果redis宕机导致没成功 那么就会导致超卖情况 解决方法就是在兑换码加唯一索引
+
+![image-20251020005115971](assets/image-20251020005115971.png)
+
+- 加分布式锁 以优惠券id为key
+- 基于Redis进行校验、扣减库存
+- MQ异步更新数据库中余票和用户领票信息
+
+**优化**
+
+1. 先获取bit位看兑换码是否被兑换 若已被兑换则返回
+2. 扣减库存和兑换码 同时记录一条操作记录 发送MQ
+3. 消费MQ消息 用户领券以及更改兑换码状态 同时新增操作记录
+
+------
+
+# 优惠券智能推荐
+
+### 优惠券分类
+
+- 无门槛券
+- 每满减券（有上限）
+- 满减券
+- 满减打折券（有上限）
+
+------
+
+### 最优解筛选
+
+- 初筛 首先实现对用户券（UserCoupon）的查询，查询条件有两个：
+
+  - 必须属于当前用户
+  - 券状态必须是未使用
+  - 订单总价超过门槛
+
+  > 查询出用户下可用的优惠券 并通过订单总价初步筛选出超过门槛的优惠券 
+
+- 细筛
+
+  - 首先要基于优惠券的限定范围对课程筛选，找出可用课程。如果没有可用课程，则优惠券不可用。
+  - 然后对可用课程计算总价，判断是否达到优惠门槛，没有达到门槛则优惠券不可用
+
+  > 基于初筛后的优惠券进行筛选 并查询数据库得到剩余优惠券的可用范围 然后统计传入的课程在此范围内的总价是否超过优惠券的门槛 进一步筛选出剩余可用优惠券
+
+- 查找最优解
+
+  - 基于全排列组合出所有使用顺序（==因为优惠券可以叠加使用 但是会重新计算每次使用完一个券的价格再传给下一个券 优惠价可能会造成不同==）
+  - 找出相同优惠金额下使用券最少的集合、相同券下金额最大的集合并取交集找到最优组合
+
+  > 进行全排列优惠券 然后根据优惠券规则使用completablefuture并发计算出每种排列下的优惠价，然后找出相同优惠金额下使用券最少的集合、相同券下金额最大的集合并取交集找到最优组合并排序返回给前端
+
+分为初筛细筛可以缓解数据库查询的一个压力 初筛过滤掉一些不符合的优惠券 在细筛的时候就不用全部都查优惠券可用范围
+
+------
+
