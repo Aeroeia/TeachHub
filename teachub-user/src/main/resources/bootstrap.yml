@@ -1,0 +1,45 @@
+server:
+  port: 8082  #端口
+  tomcat:
+    uri-encoding: UTF-8   #服务编码
+spring:
+  profiles:
+    active: dev
+  application:
+    name: user-service
+  cloud:
+    nacos:
+      config:
+        file-extension: yaml
+        shared-configs: # 共享配置
+          - data-id: shared-spring.yaml # 共享spring配置
+            refresh: false
+          - data-id: shared-redis.yaml # 共享redis配置
+            refresh: false
+          - data-id: shared-mybatis.yaml # 共享mybatis配置
+            refresh: false
+          - data-id: shared-logs.yaml # 共享日志配置
+            refresh: false
+          - data-id: shared-feign.yaml # 共享feign配置
+            refresh: false
+teachub:
+  swagger:
+    enable: true
+    enableResponseWrap: true
+    package-path: com.teachub.user.controller
+    title: TeachHub - 用户中心接口文档
+    version: v1.0
+    description: 用户微服务提供用户管理、权限管理、用户信息查询等功能
+  auth:
+    resource:
+      enable: true
+      excludeLoginPaths:
+        - /students/register
+        - /users/detail/{isStaff}
+        - /users/list
+        - GET:/users/{id}
+        - /users/{id}/type
+        - /users/ids
+        - /users/me
+  jdbc:
+    database: teachub_user

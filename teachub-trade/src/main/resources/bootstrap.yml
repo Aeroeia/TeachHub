@@ -1,0 +1,36 @@
+server:
+  port: 8088  #端口
+  tomcat:
+    uri-encoding: UTF-8   #服务编码
+spring:
+  profiles:
+    active: dev
+  application:
+    name: trade-service
+  cloud:
+    nacos:
+      config:
+        file-extension: yaml
+        shared-configs: # 共享配置
+          - dataId: shared-spring.yaml # 共享spring配置
+          - dataId: shared-redis.yaml # 共享redis配置
+          - dataId: shared-mybatis.yaml # 共享mybatis配置
+          - dataId: shared-logs.yaml # 共享日志配置
+          - dataId: shared-feign.yaml # 共享feign配置
+          - dataId: shared-mq.yaml # 共享mq配置
+          - dataId: shared-xxljob.yaml # 共享mq配置
+teachub:
+  swagger:
+    enable: true
+    enableResponseWrap: true
+    package-path: com.teachub.trade.controller
+    title: Teachub - 交易中心接口文档
+    version: v1.0
+    description: 交易微服务接口文档
+  jdbc:
+    database: teachub_trade
+  auth:
+    resource:
+      enable: true
+      excludeLoginPaths:
+        - "/order-details/enrollNum"

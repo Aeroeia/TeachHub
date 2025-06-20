@@ -1,0 +1,19 @@
+{
+  "groups": [
+    {
+      "name": "teachub.auth.gateway",
+      "type": "com.teachub.authsdk.gateway.config.AuthAutoConfiguration",
+      "sourceType": "com.teachub.authsdk.gateway.config.AuthProperties"
+    }
+  ],
+  "properties": [
+    {
+      "name": "teachub.auth.excludePath",
+      "type": "java.util.Set",
+      "description": "不用登录就能访问的路径，ant风格通配符",
+      "sourceType": "com.teachub.authsdk.gateway.config.AuthProperties",
+      "defaultValue": ""
+    }
+  ],
+  "hints": []
+}

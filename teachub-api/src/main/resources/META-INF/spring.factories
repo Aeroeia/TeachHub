@@ -1,0 +1,5 @@
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+  com.teachub.api.config.RequestIdRelayConfiguration, \
+  com.teachub.api.config.RoleCacheConfig, \
+  com.teachub.api.config.FallbackConfig, \
+  com.teachub.api.config.CategoryCacheConfig
