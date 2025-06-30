@@ -1,8 +1,15 @@
 package com.teachub.learning.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.teachub.api.client.course.CourseClient;
 import com.teachub.api.dto.course.CourseSimpleInfoDTO;
+import com.teachub.common.constants.Constant;
+import com.teachub.common.domain.dto.PageDTO;
+import com.teachub.common.domain.query.PageQuery;
+import com.teachub.common.utils.CollUtils;
 import com.teachub.learning.domain.po.LearningLesson;
+import com.teachub.learning.domain.vo.LearningLessonVO;
 import com.teachub.learning.mapper.LearningLessonMapper;
 import com.teachub.learning.service.ILearningLessonService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -12,6 +19,8 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * <p>
@@ -43,5 +52,29 @@ public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper,
         }
         //3.批量保存
         this.saveBatch(lessons);
+    }
+
+    @Override
+    public PageDTO<LearningLessonVO> queryMyLesson(Long userId, PageQuery pageQuery) {
+        Page<LearningLesson> page = pageQuery.toMpPage(Constant.LATEST_LEARN_TIME,false);
+        Page<LearningLesson> pages = this.lambdaQuery().eq(LearningLesson::getUserId, userId)
+                .page(page);
+        List<LearningLesson> lessons = pages.getRecords();
+        if(CollUtils.isEmpty(lessons)){
+            return PageDTO.empty(pages);
+        }
+        List<Long> courseIds = lessons.stream().map(LearningLesson::getCourseId).collect(Collectors.toList());
+        List<CourseSimpleInfoDTO> simpleInfoList = courseClient.getSimpleInfoList(courseIds);
+        Map<Long, CourseSimpleInfoDTO> map = simpleInfoList.stream().collect(Collectors.toMap(CourseSimpleInfoDTO::getId, c -> c));
+        List<LearningLessonVO> result = new ArrayList<>();
+        for (LearningLesson lesson : lessons) {
+            LearningLessonVO learningLessonVO = BeanUtil.copyProperties(lesson, LearningLessonVO.class);
+            CourseSimpleInfoDTO courseSimpleInfoDTO = map.get(lesson.getCourseId());
+            learningLessonVO.setCourseName(courseSimpleInfoDTO.getName());
+            learningLessonVO.setCourseCoverUrl(courseSimpleInfoDTO.getCoverUrl());
+            learningLessonVO.setSections(courseSimpleInfoDTO.getSectionNum());
+            result.add(learningLessonVO);
+        }
+        return PageDTO.of(pages, result);
     }
 }
