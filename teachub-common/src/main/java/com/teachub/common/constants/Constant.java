@@ -28,6 +28,9 @@ public interface Constant {
     // 数据字段 - updater
     String DATA_FIELD_NAME_UPDATER = "updater";
 
+    // 数据字段 - latest_learn_time
+    String LATEST_LEARN_TIME = "latest_learn_time";
+
     // 数据已经删除标识值
     boolean DATA_DELETE = true;
     // 数据未删除标识值
