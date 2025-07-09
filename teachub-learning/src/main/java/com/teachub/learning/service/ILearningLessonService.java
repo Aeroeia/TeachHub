@@ -25,4 +25,6 @@ public interface ILearningLessonService extends IService<LearningLesson> {
     LearningLessonVO getNowLesson(Long userId);
 
     void delete(Long userId, Long courseId);
+
+    Long isLessonValid(Long userId, Long courseId);
 }

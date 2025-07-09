@@ -130,4 +130,18 @@ public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper,
                 .eq(LearningLesson::getUserId,userId)
                 .remove();
     }
+
+    @Override
+    public Long isLessonValid(Long userId, Long courseId) {
+        LearningLesson lesson = this.lambdaQuery().eq(LearningLesson::getCourseId, courseId)
+                .eq(LearningLesson::getUserId, userId)
+                .one();
+        if(lesson==null){
+            throw new BizIllegalException("课程不存在");
+        }
+        if(lesson.getStatus()==LessonStatus.EXPIRED){
+            throw new BizIllegalException("课程已过期");
+        }
+        return lesson.getId();
+    }
 }

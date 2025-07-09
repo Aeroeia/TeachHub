@@ -62,4 +62,18 @@ public class LearningLessonController {
         }
         learningLessonService.delete(userId,courseId);
     }
+    @ApiOperation("查询课程是否有效")
+    @GetMapping("/{courseId}/valid")
+    Long isLessonValid(@PathVariable("courseId") Long courseId){
+        log.info("课程id:{}",courseId);
+        if(courseId==null){
+            throw new BadRequestException("获取课程id失败");
+        }
+        Long userId = UserContext.getUser();
+        log.info("用户id:{}",userId);
+        if(userId==null){
+            throw new BadRequestException("获取用户id失败");
+        }
+        return learningLessonService.isLessonValid(userId,courseId);
+    }
 }
