@@ -4,12 +4,14 @@ import com.teachub.learning.enums.LessonStatus;
 import com.teachub.learning.enums.PlanStatus;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
+import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
 
 @Data
 @ApiModel(description = "课程表信息")
+@Builder
 public class LearningLessonVO {
 
     @ApiModelProperty("主键lessonId")

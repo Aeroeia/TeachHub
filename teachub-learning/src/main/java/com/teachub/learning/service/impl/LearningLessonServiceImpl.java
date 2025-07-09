@@ -144,4 +144,25 @@ public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper,
         }
         return lesson.getId();
     }
+
+    @Override
+    public LearningLessonVO queryLearningRecordByCourse(Long userId, Long courseId) {
+        LearningLesson lesson = this.lambdaQuery().eq(LearningLesson::getUserId, userId)
+                .eq(LearningLesson::getCourseId, courseId)
+                .one();
+        if(lesson==null){
+            return null;
+        }
+        return LearningLessonVO.builder()
+                .id(lesson.getId())
+                .courseId(lesson.getCourseId())
+                .status(lesson.getStatus())
+                .learnedSections(lesson.getLearnedSections())
+                .createTime(lesson.getCreateTime())
+                .expireTime(lesson.getExpireTime())
+                .planStatus(lesson.getPlanStatus())
+                .build();
+    }
+
+
 }

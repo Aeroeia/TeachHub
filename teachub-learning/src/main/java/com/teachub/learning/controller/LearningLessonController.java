@@ -76,4 +76,16 @@ public class LearningLessonController {
         }
         return learningLessonService.isLessonValid(userId,courseId);
     }
+    @ApiOperation("查询当前用户是否有该课程")
+    @GetMapping("/{courseId}")
+    public LearningLessonVO queryLearningRecord(@PathVariable("courseId") Long courseId){
+        Long userId = UserContext.getUser();
+        if (userId == null) {
+            throw new BadRequestException("获取用户id失败");
+        }
+        if(courseId==null){
+            throw new BadRequestException("获取课程id失败");
+        }
+        return learningLessonService.queryLearningRecordByCourse(userId,courseId);
+    }
 }
