@@ -164,5 +164,11 @@ public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper,
                 .build();
     }
 
+    @Override
+    public Integer countLearningLessonByCourse(Long courseId) {
+        return this.lambdaQuery().eq(LearningLesson::getCourseId, courseId)
+                .count();
+    }
+
 
 }
