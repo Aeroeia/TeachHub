@@ -169,6 +169,21 @@ public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper,
         return this.lambdaQuery().eq(LearningLesson::getCourseId, courseId)
                 .count();
     }
-
+    /*
+  更新过期时间
+   */
+    @Override
+    public void updateExpiredLessons() {
+        List<LearningLesson> list = this.list();
+        List<Long> updateList = new ArrayList<>();
+        for(LearningLesson lesson:list){
+            LocalDateTime now = LocalDateTime.now();
+            if(now.isAfter(lesson.getExpireTime())){
+                updateList.add(lesson.getId());
+            }
+        }
+        this.lambdaUpdate().in(LearningLesson::getId,updateList)
+                .set(LearningLesson::getStatus,LessonStatus.EXPIRED);
+    }
 
 }

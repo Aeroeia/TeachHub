@@ -76,7 +76,7 @@ public class LearningLessonController {
         }
         return learningLessonService.isLessonValid(userId,courseId);
     }
-    @ApiOperation("查询当前用户是否有该课程")
+    @ApiOperation("查询当前用户指定课程状态")
     @GetMapping("/{courseId}")
     public LearningLessonVO queryLearningRecord(@PathVariable("courseId") Long courseId){
         Long userId = UserContext.getUser();
