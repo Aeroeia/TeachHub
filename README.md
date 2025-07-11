@@ -67,3 +67,41 @@ public MessageRecoverer republishMessageRecoverer(RabbitTemplate rabbitTemplate)
 当然了出现这个问题主要还是我在本地只启动了这一个微服务(其他服务跑在服务器上)，导致错误消息队列中消息没被消费，我使用try catch后确实把错误消息打印出来了，记录一下这个小小发现叭~
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/0ab6c810-0904-404b-a704-0620ea2855c3.png)
 ## 学习计划和进度模块开发
+### 循环依赖问题 
+```java
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper, LearningLesson> implements ILearningLessonService {
+    private final ILearningRecordService learningRecordService;
+}
+
+
+@Service
+@RequiredArgsConstructor
+public class LearningRecordServiceImpl extends ServiceImpl<LearningRecordMapper, LearningRecord> implements ILearningRecordService {
+    private final ILearningLessonService learningLessonService;
+}
+
+```
+会产生报错
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/304218eb-f79c-4e6c-8901-5ec72f1987c8.png)
+
+**解决方法：**
+1. 采用懒注入 @Lazy
+2. 注入下一层：Mapper
+```java
+@Service
+public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper, LearningLesson> implements ILearningLessonService {
+    @Autowired
+    @Lazy
+    private  ILearningRecordService learningRecordService;
+}
+
+@Service
+public class LearningRecordServiceImpl extends ServiceImpl<LearningRecordMapper, LearningRecord> implements ILearningRecordService {
+        @Autowired
+        @Lazy
+        private ILearningLessonService learningLessonService;
+}
+```
