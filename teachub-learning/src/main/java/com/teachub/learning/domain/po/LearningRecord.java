@@ -29,7 +29,7 @@ public class LearningRecord implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @ApiModelProperty(value = "学习记录的id")
-    @TableId(value = "id", type = IdType.AUTO)
+    @TableId(value = "id", type = IdType.ASSIGN_ID)
     private Long id;
 
     @ApiModelProperty(value = "对应课表的id")

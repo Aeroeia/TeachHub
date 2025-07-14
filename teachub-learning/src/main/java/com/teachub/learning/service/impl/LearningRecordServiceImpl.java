@@ -25,6 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -134,13 +135,20 @@ public class LearningRecordServiceImpl extends ServiceImpl<LearningRecordMapper,
                 .eq(LearningRecord::getSectionId, learningRecordFormDTO.getSectionId())
                 .one();
         //判断是否学完
-        boolean finished = learningRecordFormDTO.getMoment() * 2 >= learningRecordFormDTO.getDuration();
+        boolean finished = false;
+        if(learningRecordFormDTO.getMoment()!=null){
+            finished = learningRecordFormDTO.getMoment() * 2 >= learningRecordFormDTO.getDuration();
+        }
         //课程不存在新增
         if(learningRecord==null){
             learningRecord = BeanUtils.copyBean(learningRecordFormDTO, LearningRecord.class);
             learningRecord.setFinishTime(finished ? LocalDateTime.now() : null);
             learningRecord.setFinished(finished);
             learningRecord.setUpdateTime(learningRecordFormDTO.getCommitTime());
+            learningRecord.setUserId(userId);
+            if(learningRecordFormDTO.getMoment()!=null){
+                learningRecord.setMoment(learningRecordFormDTO.getMoment());
+            }
             this.save(learningRecord);
         }
         //课程存在更新
@@ -149,6 +157,9 @@ public class LearningRecordServiceImpl extends ServiceImpl<LearningRecordMapper,
             learningRecord.setFinishTime(!learningRecord.getFinished()&&finished ? LocalDateTime.now() : learningRecord.getFinishTime());
             learningRecord.setFinished(finished);
             learningRecord.setUpdateTime(learningRecordFormDTO.getCommitTime());
+            if(learningRecordFormDTO.getMoment()!=null){
+                learningRecord.setMoment(learningRecordFormDTO.getMoment());
+            }
             this.lambdaUpdate().eq(LearningRecord::getId, learningRecord.getId()).update(learningRecord);
         }
         return finished;
