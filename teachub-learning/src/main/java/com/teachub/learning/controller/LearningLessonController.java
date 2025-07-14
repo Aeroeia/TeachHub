@@ -7,6 +7,7 @@ import com.teachub.common.exceptions.BadRequestException;
 import com.teachub.common.utils.UserContext;
 import com.teachub.learning.domain.dto.LearningPlanDTO;
 import com.teachub.learning.domain.vo.LearningLessonVO;
+import com.teachub.learning.domain.vo.LearningPlanPageVO;
 import com.teachub.learning.service.ILearningLessonService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -104,5 +105,13 @@ public class LearningLessonController {
     public void savePlans(@RequestBody @Validated LearningPlanDTO learningPlanDTO){
         log.info("学习计划:{}",learningPlanDTO);
         learningLessonService.savePlans(learningPlanDTO);
+    }
+
+    @ApiOperation("查看学习计划")
+    @GetMapping("/plans")
+    public LearningPlanPageVO queryMyPlan(PageQuery pageQuery){
+        log.info("分页查询参数:{}",pageQuery);
+        log.info("查看学习计划");
+        return learningLessonService.queryMyPlan(pageQuery);
     }
 }

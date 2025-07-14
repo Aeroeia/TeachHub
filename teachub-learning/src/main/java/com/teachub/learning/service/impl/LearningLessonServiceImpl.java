@@ -1,7 +1,10 @@
 package com.teachub.learning.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import com.baomidou.mybatisplus.core.metadata.OrderItem;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.teachub.api.client.course.CatalogueClient;
 import com.teachub.api.client.course.CourseClient;
 import com.teachub.api.dto.course.CataSimpleInfoDTO;
@@ -16,13 +19,19 @@ import com.teachub.common.utils.CollUtils;
 import com.teachub.common.utils.UserContext;
 import com.teachub.learning.domain.dto.LearningPlanDTO;
 import com.teachub.learning.domain.po.LearningLesson;
+import com.teachub.learning.domain.po.LearningRecord;
 import com.teachub.learning.domain.vo.LearningLessonVO;
+import com.teachub.learning.domain.vo.LearningPlanPageVO;
+import com.teachub.learning.domain.vo.LearningPlanVO;
 import com.teachub.learning.enums.LessonStatus;
 import com.teachub.learning.enums.PlanStatus;
 import com.teachub.learning.mapper.LearningLessonMapper;
 import com.teachub.learning.service.ILearningLessonService;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.teachub.learning.service.ILearningRecordService;
+import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -41,16 +50,20 @@ import java.util.stream.Collectors;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper, LearningLesson> implements ILearningLessonService {
     private final CourseClient courseClient;
     private final CatalogueClient catalogueClient;
+    @Lazy
+    @Autowired
+    private ILearningRecordService learningRecordService;
     @Override
     public void saveLearningLeesons(Long userId, List<Long> ids) {
         //1.远程调用course微服务得到课程信息
         List<CourseSimpleInfoDTO> simpleInfoList = courseClient.getSimpleInfoList(ids);
         //2.封装po实体类，填充过期时间
         List<LearningLesson> lessons = new ArrayList<>();
-        for(CourseSimpleInfoDTO info : simpleInfoList){
+        for (CourseSimpleInfoDTO info : simpleInfoList) {
             LocalDateTime expireTime = LocalDateTime.now().plusMonths(info.getValidDuration());
             LearningLesson lesson = LearningLesson.builder()
                     .courseId(info.getId())
@@ -124,12 +137,14 @@ public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper,
 
     @Override
     public void delete(Long userId, Long courseId) {
+        log.info("课程删除");
         LearningLesson lesson = this.lambdaQuery().eq(LearningLesson::getUserId, userId)
                 .eq(LearningLesson::getCourseId, courseId)
                 .one();
         if(lesson==null){
-            throw new BizIllegalException("课表不存在该课程");
+            return;
         }
+        log.info("课程:{}",lesson);
         this.lambdaUpdate().eq(LearningLesson::getCourseId,courseId)
                 .eq(LearningLesson::getUserId,userId)
                 .remove();
@@ -174,8 +189,8 @@ public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper,
                 .count();
     }
     /*
-  更新过期时间
-   */
+    更新过期时间
+     */
     @Override
     public void updateExpiredLessons() {
         List<LearningLesson> list = this.list();
@@ -203,5 +218,65 @@ public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper,
                 .set(LearningLesson::getWeekFreq,learningPlanDTO.getFreq())
                 .update();
     }
+
+    @Override
+    public LearningPlanPageVO queryMyPlan(PageQuery pageQuery) {
+        Long userId = UserContext.getUser();
+        if(userId==null){
+            throw new BadRequestException("用户未登录");
+        }
+        //TODO 获取积分
+
+        //分页
+        Page<LearningLesson> page = pageQuery.toMpPageDefaultSortByCreateTimeDesc();
+        //查询课表
+        Page<LearningLesson> p = this.lambdaQuery().eq(LearningLesson::getUserId, userId)
+                .in(LearningLesson::getStatus, LessonStatus.LEARNING, LessonStatus.NOT_BEGIN)
+                .eq(LearningLesson::getPlanStatus, PlanStatus.PLAN_RUNNING)
+                .page(page);
+        List<LearningLesson> lessons = p.getRecords();
+        if(CollUtils.isEmpty(lessons)){
+            return null;
+        }
+        //获取本周总计划学习数量
+        Integer totalPlans = lessons.stream().map(LearningLesson::getWeekFreq).reduce(0, Integer::sum);
+        //获取本周学习记录
+        List<Long> ids = lessons.stream().map(LearningLesson::getId).collect(Collectors.toList());
+        List<LearningRecord> learningRecords = learningRecordService.lambdaQuery().in(LearningRecord::getLessonId, ids)
+                .gt(LearningRecord::getUpdateTime,LocalDateTime.now().minusDays(7))
+                .eq(LearningRecord::getFinished, true)
+                .list();
+        //获取本周学习总量
+        Integer totalLearned = learningRecords.size();
+        //获取课程信息
+        List<Long> courseIds = lessons.stream().map(LearningLesson::getCourseId).collect(Collectors.toList());
+        List<CourseSimpleInfoDTO> simpleInfoList = courseClient.getSimpleInfoList(courseIds);
+        //对课程根据id分类
+        Map<Long, CourseSimpleInfoDTO> courseMap = simpleInfoList.stream().collect(Collectors.toMap(CourseSimpleInfoDTO::getId, e -> e));
+        //对学习记录根据课表id分类
+        Map<Long, List<LearningRecord>> recordMap = learningRecords.stream().collect(Collectors.groupingBy(LearningRecord::getLessonId));
+        List<LearningPlanVO> learningPlanVOS = new ArrayList<>();
+        for(LearningLesson lesson :  lessons){
+            Long lessonId = lesson.getId();
+            LearningPlanVO learningPlanVO = new LearningPlanVO();
+            learningPlanVO.setId(lessonId);
+            learningPlanVO.setLearnedSections(lesson.getLearnedSections());
+            learningPlanVO.setLatestLearnTime(lesson.getLatestLearnTime());
+            learningPlanVO.setWeekLearnedSections(recordMap.get(lessonId)==null?0:recordMap.get(lessonId).size());
+            learningPlanVO.setCourseId(lesson.getCourseId());
+            learningPlanVO.setWeekFreq(lesson.getWeekFreq());
+            learningPlanVO.setCourseName(courseMap.get(lesson.getCourseId()).getName());
+            learningPlanVO.setSections(courseMap.get(lesson.getCourseId()).getSectionNum());
+            learningPlanVOS.add(learningPlanVO);
+        }
+        LearningPlanPageVO learningPlanPageVO = new LearningPlanPageVO();
+        learningPlanPageVO.setWeekTotalPlan(totalLearned);
+        learningPlanPageVO.setWeekFinished(totalLearned);
+        learningPlanPageVO.setPages(p.getPages());
+        learningPlanPageVO.setTotal(p.getTotal());
+        learningPlanPageVO.setList(learningPlanVOS);
+        return learningPlanPageVO;
+    }
+
 
 }

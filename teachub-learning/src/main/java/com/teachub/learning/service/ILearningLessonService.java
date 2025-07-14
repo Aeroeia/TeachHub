@@ -6,6 +6,7 @@ import com.teachub.learning.domain.dto.LearningPlanDTO;
 import com.teachub.learning.domain.po.LearningLesson;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.teachub.learning.domain.vo.LearningLessonVO;
+import com.teachub.learning.domain.vo.LearningPlanPageVO;
 
 import java.util.List;
 
@@ -36,4 +37,6 @@ public interface ILearningLessonService extends IService<LearningLesson> {
     void updateExpiredLessons();
 
     void savePlans(LearningPlanDTO learningPlanDTO);
+
+    LearningPlanPageVO queryMyPlan(PageQuery pageQuery);
 }
