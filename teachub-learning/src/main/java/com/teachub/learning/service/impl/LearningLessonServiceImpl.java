@@ -3,7 +3,6 @@ package com.teachub.learning.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.metadata.OrderItem;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.teachub.api.client.course.CatalogueClient;
 import com.teachub.api.client.course.CourseClient;
@@ -16,6 +15,7 @@ import com.teachub.common.domain.query.PageQuery;
 import com.teachub.common.exceptions.BadRequestException;
 import com.teachub.common.exceptions.BizIllegalException;
 import com.teachub.common.utils.CollUtils;
+import com.teachub.common.utils.DateUtils;
 import com.teachub.common.utils.UserContext;
 import com.teachub.learning.domain.dto.LearningPlanDTO;
 import com.teachub.learning.domain.po.LearningLesson;
@@ -34,6 +34,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -242,9 +243,12 @@ public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper,
         Integer totalPlans = lessons.stream().map(LearningLesson::getWeekFreq).reduce(0, Integer::sum);
         //获取本周学习记录
         List<Long> ids = lessons.stream().map(LearningLesson::getId).collect(Collectors.toList());
+        LocalDate now = LocalDate.now();
+        LocalDateTime weekBeginTime = DateUtils.getWeekBeginTime(now);
+        LocalDateTime weekEndTime = DateUtils.getWeekEndTime(now);
         List<LearningRecord> learningRecords = learningRecordService.lambdaQuery().in(LearningRecord::getLessonId, ids)
-                .gt(LearningRecord::getUpdateTime,LocalDateTime.now().minusDays(7))
                 .eq(LearningRecord::getFinished, true)
+                .between(LearningRecord::getUpdateTime, weekBeginTime, weekEndTime)
                 .list();
         //获取本周学习总量
         Integer totalLearned = learningRecords.size();
@@ -270,7 +274,7 @@ public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper,
             learningPlanVOS.add(learningPlanVO);
         }
         LearningPlanPageVO learningPlanPageVO = new LearningPlanPageVO();
-        learningPlanPageVO.setWeekTotalPlan(totalLearned);
+        learningPlanPageVO.setWeekTotalPlan(totalPlans);
         learningPlanPageVO.setWeekFinished(totalLearned);
         learningPlanPageVO.setPages(p.getPages());
         learningPlanPageVO.setTotal(p.getTotal());
