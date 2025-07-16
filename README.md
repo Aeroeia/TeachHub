@@ -2,13 +2,12 @@
 ## 整体架构
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tianji-system.jpg)
 ## 我的课表模块开发 
->Tips:在分布式系统中，使用数据库自增ID容易造成性能瓶颈和ID冲突，因为多个节点同时生成ID需要依赖数据库集中控制。而雪花算法（Snowflake）能在不同节点上本地高效、唯一地生成ID，避免分布式锁和数据库竞争问题，具有高可用、无中心、趋势递增等优点。因此，分布式系统推荐采用雪花算法而非默认的自增ID。
-### 表结构设计
+>Tips:在分布式系统中，使用数据库自增ID容易造成性能瓶颈和ID冲突，因为多个节点同时生成ID需要依赖数据库集中控制。而雪花算法（Snowflake）能在不同节点上本地高效、唯一地生成ID，避免分布式锁和数据库竞争问题，具有高可用、无中心、趋势递增等优点。因此，分布式系统推荐采用雪花算法而非默认的自增ID
 ---
-#### 业务流程分析
+### 业务流程分析
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/drawio.png)
 
-#### 页面开发规则
+#### 页面开发规则&接口设计
 - 未学习，已购买课程还未开始学习，可以开始学习
 - 已学习，已购买课程已开始学习，展示学习进度，可以继续学习
 - 已学完，已购买课程已经学完，可以重新学习
@@ -25,7 +24,7 @@
 | 退款后移除课表中的课程                 | MQ通知   | -                                | 退款成功后通过 MQ 移除课程       |
 | 校验指定课程是否是有效课表课程（Feign）| GET      | /lessons/{courseId}/valid        | Feign 接口，用于远程调用校验     |
 | 统计课程学习人数（Feign）              | GET      | /lessons/{courseId}/count        | Feign 接口，用于远程统计人数     |
-
+### 表结构设计
 #### ER图
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/Unknown.png)
 #### 字段分析
@@ -67,6 +66,35 @@ public MessageRecoverer republishMessageRecoverer(RabbitTemplate rabbitTemplate)
 当然了出现这个问题主要还是我在本地只启动了这一个微服务(其他服务跑在服务器上)，导致错误消息队列中消息没被消费，我使用try catch后确实把错误消息打印出来了，记录一下这个小小发现叭~
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/0ab6c810-0904-404b-a704-0620ea2855c3.png)
 ## 学习计划和进度模块开发
+### 业务流程分析
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/a1.png)
+#### 接口设计
+1. 创建学习计划
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/1.1.png)
+2. 查询学习记录
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/1.2.png)
+3. 提交学习记录
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/1.3.png)
+4. 查询我的学习计划
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/1.4.png)
+#### 数据库设计
+数据表的设计要满足学习计划、学习进度的功能需求。学习计划信息在learning_lesson表中已经设计，因此我们关键是设计学习进度记录表即可。
+
+按照之前的分析，用户学习的课程包含多个小节，小节的类型包含两种：
+- 视频：视频播放进度超过50%就算当节学完
+- 考试：考完就算一节学完
+学习进度除了要记录哪些小节学完，还要记录学过的小节、每小节的播放的进度（方便续播）。因此，需要记录的数据就包含以下部分：
+- 学过的小节的基础信息
+  - 小节id
+  - 小节对应的lessonId
+  - 用户id：学习课程的人
+- 小节的播放进度信息
+  - 视频播放进度：也就是播放到了第几秒
+  - 是否已经学完：播放进度有没有超过50%
+  - 第一次学完的时间：用户可能重复学习，第一次从未学完到学完的时间要记录下来
+
+再加上一些表基础字段，整张表结构就出来了：
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/sql.png)
 ### 循环依赖问题 
 ```java
 @Service
@@ -90,18 +118,9 @@ public class LearningRecordServiceImpl extends ServiceImpl<LearningRecordMapper,
 **解决方法：**
 1. 采用懒注入 @Lazy
 ```java
-@Service
-public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper, LearningLesson> implements ILearningLessonService {
-    @Autowired
-    @Lazy
-    private  ILearningRecordService learningRecordService;
-}
-
-@Service
-public class LearningRecordServiceImpl extends ServiceImpl<LearningRecordMapper, LearningRecord> implements ILearningRecordService {
-        @Autowired
-        @Lazy
-        private ILearningLessonService learningLessonService;
-}
+@Lazy
+@Autowired
+private  ILearningRecordService learningRecordService;
 ```
-2. 注入下一层：Mapper
+2. 注入Mapper
+## 高并发优化
