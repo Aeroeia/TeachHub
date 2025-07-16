@@ -2,10 +2,12 @@ package com.teachub.api.dto.leanring;
 
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
+import lombok.Builder;
 import lombok.Data;
 
 @Data
 @ApiModel(description = "小节信息及学习进度")
+@Builder
 public class LearningRecordDTO {
     @ApiModelProperty("对应节的id")
     private Long sectionId;
