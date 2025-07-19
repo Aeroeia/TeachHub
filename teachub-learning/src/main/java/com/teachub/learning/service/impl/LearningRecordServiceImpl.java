@@ -67,7 +67,7 @@ public class LearningRecordServiceImpl extends ServiceImpl<LearningRecordMapper,
                         .sectionId(r.getSectionId())
                         .moment(r.getMoment())
                         .finished(r.getFinished())
-                        .build()).collect(Collectors.toList());
+                        .build()).collect (Collectors.toList());
         return LearningLessonDTO.builder()
                 .id(lessonId)
                 .latestSectionId(lesson.getLatestSectionId())
