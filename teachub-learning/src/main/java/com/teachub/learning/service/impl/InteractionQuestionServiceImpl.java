@@ -125,4 +125,30 @@ public class InteractionQuestionServiceImpl extends ServiceImpl<InteractionQuest
         }
         return PageDTO.of(p, result);
     }
+
+    @Override
+    public QuestionVO queryById(Long id) {
+        //非法校验
+        if(id==null){
+            throw new BadRequestException("问题id不能为空");
+        }
+        InteractionQuestion interactionQuestion = this.lambdaQuery().eq(InteractionQuestion::getId, id).one();
+        if(interactionQuestion==null){
+            throw new BadRequestException("问题不存在");
+        }
+        //判断是否隐藏
+        if(interactionQuestion.getHidden()){
+            return null;
+        }
+        QuestionVO questionVO = BeanUtils.copyBean(interactionQuestion, QuestionVO.class);
+        if(!interactionQuestion.getAnonymity()){
+            UserDTO userDTO = userClient.queryUserById(interactionQuestion.getUserId());
+            if(userDTO==null){
+                throw new BadRequestException("用户不存在");
+            }
+            questionVO.setUserName(userDTO.getName());
+            questionVO.setUserIcon(userDTO.getIcon());
+        }
+        return questionVO;
+    }
 }
