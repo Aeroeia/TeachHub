@@ -251,4 +251,15 @@ public class InteractionQuestionServiceImpl extends ServiceImpl<InteractionQuest
         }
         return PageDTO.of(page, result);
     }
+
+    @Override
+    public void updateHidden(Long id, Boolean hidden) {
+        Long userId = UserContext.getUser();
+        if(userId==null){
+            throw new BadRequestException("用户未登录");
+        }
+        this.lambdaUpdate().eq(InteractionQuestion::getId,id)
+                .set(InteractionQuestion::getHidden,hidden)
+                .update();
+    }
 }
