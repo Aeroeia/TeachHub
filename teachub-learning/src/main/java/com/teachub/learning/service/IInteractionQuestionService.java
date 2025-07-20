@@ -1,10 +1,12 @@
 package com.teachub.learning.service;
 
 import com.teachub.common.domain.dto.PageDTO;
+import com.teachub.learning.domain.dto.QuestionAdminPageQuery;
 import com.teachub.learning.domain.dto.QuestionFormDTO;
 import com.teachub.learning.domain.dto.QuestionPageQuery;
 import com.teachub.learning.domain.po.InteractionQuestion;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.teachub.learning.domain.vo.QuestionAdminVO;
 import com.teachub.learning.domain.vo.QuestionVO;
 
 /**
@@ -26,4 +28,6 @@ public interface IInteractionQuestionService extends IService<InteractionQuestio
     QuestionVO queryById(Long id);
 
     void delete(Long id);
+
+    PageDTO<QuestionAdminVO> queryAdminQuestions(QuestionAdminPageQuery query);
 }
