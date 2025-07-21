@@ -4,6 +4,7 @@ import com.teachub.common.domain.dto.PageDTO;
 import com.teachub.common.exceptions.BadRequestException;
 import com.teachub.learning.domain.dto.QuestionAdminPageQuery;
 import com.teachub.learning.domain.vo.QuestionAdminVO;
+import com.teachub.learning.domain.vo.QuestionVO;
 import com.teachub.learning.service.IInteractionQuestionService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -32,6 +33,15 @@ public class InteractionQuestionAdminController {
             throw new BadRequestException("参数错误");
         }
         interactionQuestionService.updateHidden(id,hidden);
+    }
+    @ApiOperation("根据id查看问题详情")
+    @GetMapping("/{id}")
+    public QuestionAdminVO queryDetailsById(@PathVariable Long id){
+        log.info("问题id:{}",id);
+        if(id==null){
+            throw new BadRequestException("参数错误");
+        }
+        return interactionQuestionService.queryDetailsById(id);
     }
 
 }
