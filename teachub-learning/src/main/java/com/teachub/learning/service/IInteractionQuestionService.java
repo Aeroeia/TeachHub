@@ -32,4 +32,5 @@ public interface IInteractionQuestionService extends IService<InteractionQuestio
     PageDTO<QuestionAdminVO> queryAdminQuestions(QuestionAdminPageQuery query);
 
     void updateHidden(Long id, Boolean hidden);
+
 }
