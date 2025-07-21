@@ -33,10 +33,12 @@ import com.teachub.course.utils.CategoryDataWrapper2;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
@@ -46,15 +48,15 @@ import java.util.stream.Collectors;
  * 课程分类 服务实现类
  * </p>
  *
- *  wusongsong
- * @  07-14
+ * @author wusongsong
+ * @since 2022-07-14
  */
 @Service
 @Slf4j
 public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> implements ICategoryService {
 
     @Autowired
-    private RedisTemplate redisTemplate;
+    private StringRedisTemplate redisTemplate;
 
     @Autowired
     private SubjectCategoryMapper subjectCategoryMapper;
@@ -354,6 +356,14 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
 
     @Override
     public List<CategoryVO> allOfOneLevel() {
+        List<String> objs = redisTemplate.opsForList().range(Constant.REDIS_CACHE_NAME, 0, -1);
+        if(CollUtils.isNotEmpty(objs)){
+            List<CategoryVO> collect = objs.stream().map(obj -> {
+                CategoryVO bean = JsonUtils.toBean(obj, CategoryVO.class);
+                return bean;
+            }).collect(Collectors.toList());
+            return collect;
+        }
         //1.查询数据
         List<Category> list = super.list();
         if (CollUtils.isEmpty(list)) {
@@ -362,9 +372,14 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
 
         //2.统计一级二级目录对应的三级目录的数量，做一个三分钟的redis缓存
         Map<Long, Long> thirdCategoryNumMap = this.statisticThirdCategory();
-        return BeanUtils.copyList(list, CategoryVO.class, (category, categoryVO) -> {
+        List<CategoryVO> categoryVOS = BeanUtils.copyList(list, CategoryVO.class, (category, categoryVO) -> {
             categoryVO.setThirdCategoryNum(thirdCategoryNumMap.getOrDefault(category.getId(), 0L).intValue());
         });
+        List<String> collect = categoryVOS.stream().map(obj -> JsonUtils.toJsonStr(obj)).collect(Collectors.toList());
+        log.info("写入redis缓存:{}",collect);
+        redisTemplate.opsForList().rightPushAll(Constant.REDIS_CACHE_NAME,collect);
+        redisTemplate.expire(Constant.REDIS_CACHE_NAME, Duration.ofMinutes(3));
+        return categoryVOS;
     }
 
     @Override
