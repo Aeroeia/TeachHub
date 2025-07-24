@@ -34,6 +34,7 @@ public class LikedListener {
         }
         else{
             interactionReplyService.lambdaUpdate()
+                    .eq(InteractionReply::getId,likedTimesDTO.getBizId())
                     .setSql("liked_times=liked_times-1")
                     .update();
         }

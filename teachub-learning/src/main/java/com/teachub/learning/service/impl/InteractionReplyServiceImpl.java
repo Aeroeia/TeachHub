@@ -2,6 +2,7 @@ package com.teachub.learning.service.impl;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.teachub.api.client.remark.RemarkClient;
 import com.teachub.api.client.user.UserClient;
 import com.teachub.api.dto.user.UserDTO;
 import com.teachub.common.domain.dto.PageDTO;
@@ -42,6 +43,7 @@ public class InteractionReplyServiceImpl extends ServiceImpl<InteractionReplyMap
     @Lazy
     private IInteractionQuestionService interactionQuestionService;
     private final UserClient userClient;
+    private final RemarkClient remarkClient;
 
     @Override
     @Transactional
@@ -75,13 +77,6 @@ public class InteractionReplyServiceImpl extends ServiceImpl<InteractionReplyMap
         return handleAnswer(replyPageQuery, isAdmin);
     }
 
-    @Override
-    public void updateHidden(Long id, Boolean hidden) {
-        this.lambdaUpdate().eq(InteractionReply::getId, id)
-                .set(InteractionReply::getHidden, hidden)
-                .update();
-    }
-
     private PageDTO<ReplyVO> handleQuestion(ReplyPageQuery replyPageQuery, boolean isAdmin) {
         //构建分页条件
         Page<InteractionReply> page = this.lambdaQuery().eq(InteractionReply::getQuestionId, replyPageQuery.getQuestionId())
@@ -99,12 +94,18 @@ public class InteractionReplyServiceImpl extends ServiceImpl<InteractionReplyMap
         Set<Long> userIds = records.stream().map(InteractionReply::getUserId).collect(Collectors.toSet());
         List<UserDTO> userDTOS = userClient.queryUserByIds(userIds);
         Map<Long, UserDTO> userMap = userDTOS.stream().collect(Collectors.toMap(UserDTO::getId, u -> u));
+        //查询是否点赞
+        List<Long> collect = records.stream().map(InteractionReply::getId).collect(Collectors.toList());
+        Set<Long> batchLiked = remarkClient.getBatchLiked(collect);
         //赋值
         for (ReplyVO replyVO : replyVOS) {
             replyVO.setUserType(userMap.get(replyVO.getUserId()).getType());
             if (!replyVO.getAnonymity() || isAdmin) {
                 replyVO.setUserName(userMap.get(replyVO.getUserId()).getName());
                 replyVO.setUserIcon(userMap.get(replyVO.getUserId()).getIcon());
+            }
+            if(batchLiked.contains(replyVO.getId())){
+                replyVO.setLiked(true);
             }
         }
         return PageDTO.of(page, replyVOS);
@@ -131,6 +132,9 @@ public class InteractionReplyServiceImpl extends ServiceImpl<InteractionReplyMap
         }
         List<UserDTO> userDTOS = userClient.queryUserByIds(ids);
         Map<Long, UserDTO> userMap = userDTOS.stream().collect(Collectors.toMap(UserDTO::getId, u -> u));
+        //判断是否点过赞
+        List<Long> collect = records.stream().map(InteractionReply::getId).collect(Collectors.toList());
+        Set<Long> batchLiked = remarkClient.getBatchLiked(collect);
         //po->vo
         List<ReplyVO> result = new ArrayList<>();
         for (InteractionReply reply : records) {
@@ -143,9 +147,18 @@ public class InteractionReplyServiceImpl extends ServiceImpl<InteractionReplyMap
             if (reply.getTargetUserId() != null) {
                 replyVO.setTargetUserName(userMap.get(reply.getTargetUserId()).getName());
             }
+            if(batchLiked.contains(reply.getId())){
+                replyVO.setLiked(true);
+            }
             result.add(replyVO);
         }
         return PageDTO.of(page, result);
 
+    }
+    @Override
+    public void updateHidden(Long id, Boolean hidden) {
+        this.lambdaUpdate().eq(InteractionReply::getId, id)
+                .set(InteractionReply::getHidden, hidden)
+                .update();
     }
 }
