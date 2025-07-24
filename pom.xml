@@ -22,6 +22,7 @@
         <module>teachub-trade</module>
         <module>teachub-exam</module>
         <module>teachub-data</module>
+        <module>teachub-remark</module>
     </modules>
     <packaging>pom</packaging>
 
