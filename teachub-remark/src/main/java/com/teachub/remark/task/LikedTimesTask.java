@@ -1,5 +1,6 @@
 package com.teachub.remark.task;
 
+import com.teachub.remark.config.LikeProperty;
 import com.teachub.remark.service.ILikedRecordService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,14 +13,13 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class LikedTimesTask {
-    private static final List<String> bizType = List.of("QA","NOTE");
     private static final Integer MAX_BIZ_SIZE = 30;
     private final ILikedRecordService likedRecordService;
-
+    private final LikeProperty bizType;
     @Scheduled(fixedDelay = 20000)
     public void syncLikedTimes(){
         log.info("开始同步点赞数");
-        for(String type : bizType){
+        for(String type : bizType.getBizTypes()){
             likedRecordService.readLikedTimesAndSendMsg(type,MAX_BIZ_SIZE);
         }
     }
