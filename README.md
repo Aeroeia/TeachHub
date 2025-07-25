@@ -12,7 +12,8 @@
 - 已学习，已购买课程已开始学习，展示学习进度，可以继续学习
 - 已学完，已购买课程已经学完，可以重新学习
 - 已失效，已购买课程已过期，不可继续学习，只能删除课程操作
-- 
+
+
 综上设计出以下接口
 | 接口用途                               | 请求方式 | 请求路径                         | 备注说明                         |
 |----------------------------------------|----------|----------------------------------|----------------------------------|
@@ -188,6 +189,216 @@ private  ILearningRecordService learningRecordService;
 
 **流程如下**
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/op.png)
-## 问答系统
+## 问答系统开发
+### 产品原型
+#### 1.课程详情页
+在用户已经登录的情况下，如果用户购买了课程，在课程详情页可以看到一个互动问答的选项卡：
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/1280X1280.PNG)
+问答选项卡如下：
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/2.PNG)
+```
+1. 问答列表
+- 问答列表可以选择全部问题还是我的问题，选择我的问题则只展示我提问的问题。默认是全部
+- 选择章节序号，根据章节号查看章节下对应问答。默认展示所有章节的问题
+- 对于我提问的问题，可以做删除、修改操作
+2. 跳转逻辑
+- 点击提问按钮，进入问题编辑页面
+- 点击问题标题，进入问题详情页
+- 点击问题下的回答，进入回答表单
+```
+
+点击提问或编辑按钮会进入问题编辑页面：
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/3.png)
+```
+1. 表单内容
+- 课程：问题一定关联提问时所在的课程，无需选择
+- 章节：可以选择提问知识点对应的章节，也可以不选
+- 问题标题：一个概括性描述
+- 问题详情：详细问题信息，富文本
+- 是否匿名：用户可以选择匿名提问，其它用户不可见提问者信息
+```
+
+点击某个问题，则会进入问题详情页面：
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/4.png)
+```
+1. 页面内容
+- 顶部展示问题相关详细信息
+- 任何人都可以对问题做回复，也可以对他人的回答再次回复，无限叠楼。
+- 也没渲染只分两层：
+  - 对问题的一级回复，称为回答
+  - 对回答的回复、对回复的回复，作为第二级，称为评论
+- 问题详情页下面展示问题下的所有回答
+- 点击回答下的详情才展示二级评论
+- 可以对评论、回答点赞
+```
+#### 2.视频学习页
+另外，在视频学习页面中同样可以看到互动问答功能：
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/5.png)
+这个页面与课程详情页功能类似，只不过是在观看视频的过程中操作。用户产生学习疑问是可以快速提问，不用退回到课程详情页，用户体验较好。
+```
+1. 页面逻辑
+- 默认展示视频播放小节下的问答
+- 用户可以在这里提问问题，自动与当前课程、当前视频对应章节关联。其它参数与课程详情页的问题表单类似。
+- 问答列表默认只显示问题，点击后进入问题详情页才能查看具体答案
+```
+#### 3.管理端问答管理页
+除了用户端以外，管理端也可以管理互动问答，首先是一个列表页：
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/6.png)
+```
+1. 搜索
+- 管理员可以搜索用户提出的所有问题
+- 搜索结果可以基于页面过滤条件做过滤
+  - 问题状态：已查看、未查看两种。标示是否已经被管理员查看过。每当学员在问题下评论，状态重置为未查看
+  - 课程名称：由于问题是提问在课程下的，所以会跟课程关联。管理员输入课程名称，搜索该课程下的所有问题
+  - 提问时间：提出问题的时间
+
+2. 页面列表
+- 默认按照提问时间倒序排列；点击回答数量时可以根据回答数量排序
+- 课程分类：需要展示问题所属课程的三级分类的名称的拼接
+- 课程所属章节：如果是在视频页面提问，则问题会与视频对应的章、节关联，则此处显示章名称、节名称。
+- 课程名称：提问是针对某个课程的，因此此处显示对应的课程名称
+- 回答数量：该问题下的一级回复，称为回答。此处显示问题下的回答的数量，其它评论不统计。
+- 用户端状态：隐藏/显示。表示是否在用户端展示，对于一些敏感话题，管理员可以直接隐藏问题。
+
+3. 操作
+- 点击查看：会将该问题标记为已查看状态，并且跳转到问题详情页
+- 点击隐藏或显示：控制该问题是否在用户端显示。隐藏问题，则问题下的所有回答和恢复都被隐藏
+```
+点击查看按钮，会进入一个问题详情页面：
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/7.png)
+```
+1. 问题详情
+- 页面顶部是问题详情，展示信息与问题列表页基本一致
+- 点击评论，老师可以回答问题
+- 点击隐藏/显示，可以隐藏或显示问题
+2. 回答列表
+- 分页展示问题下的回答（一级回复）
+- 可以对回答点赞、评论、隐藏
+- 点击查看，则进入回答详情页
+```
+继续点击查看更多按钮，可以进入回答详情页：
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/8.png)
+```
+1. 回答详情
+- 页面顶部是回答详情，展示信息与回答列表页基本一致
+- 点击我来评论，老师可以评论该回答
+- 点击隐藏/显示，可以隐藏或显示该回答，该回答下的所有评论也都会被隐藏或显示
+2. 评论列表
+- 分页展示回答下的评论
+- 可以对评论点赞、回复、隐藏
+```
+### 接口设计
+| 编号 | 接口简述                              |
+|------|-------------------------------------|
+| **互动问题相关接口**                |                                     |
+| 1    | 新增互动问题                        |
+| 2    | 修改互动问题                        |
+| 3    | 分页查询问题（用户端）              |
+| 4    | 根据id查询问题详情（用户端）        |
+| 5    | 删除我的问题                        |
+| 6    | 分页查询问题（管理端）              |
+| 7    | 根据id查询问题详情（管理端）        |
+| 8    | 隐藏或显示指定问题（管理端）        |
+| **回答及评论相关接口**              |                                     |
+| 1    | 新增回答或评论                      |
+| 2    | 分页查询回答或评论列表              |
+| 4    | 隐藏或显示指定回答或评论（管理端）  |
+---
+### ER图
+#### 1.问题的ER图
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/whiteboard_exported_image-3.png)
+#### 2..回答、评论的ER图
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/whiteboard_exported_image-2.png)
+
 ### 三级缓存
-![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/Caffeine_Redis.png)
+在管理端分页查询问题的时候，需要查询课程的分类信息，而课程的分类有三级
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/cata.png)
+每一个课程都与第三级分类关联，因此向上级追溯，也有对应的二级、一级分类。在课程微服务提供的查询课程的接口中，可以看到返回的课程信息中就包含了关联的一级、二级、三级分类。因此，只要我们查询到了问题所属的课程，就能知道课程关联的三级分类id。  
+这里有一个值得思考的点：课程分类数据在很多业务中都需要查询，这样的数据如此频繁的查询，就需要用到缓存来提高性能
+
+像这样的数据，除了建立Redis缓存以外，还非常适合做本地缓存（Local Cache）。这样就可以形成多级缓存机制：
+- 数据查询时优先查询本地缓存
+- 本地缓存不存在，再查询Redis缓存
+- Redis不存在，再去查询数据库。
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/whiteboard_exported_image.png)
+## 点赞系统
+### 业务流程
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-remark/whiteboard_exported_image.png)
+该业务可以采用以下思路进行实现:
+1. 用户点赞后查询Redis是否存在该用户点赞记录(set)，若存在则直接返回，不存在则在redis新增点赞记录(zset)，采用定时任务，定期将数据通过mq发送到对应业务微服务更新点赞数量，同时清除zset中的数据  
+2. 查询用户是否点赞远程微服务通过feign接口调用remark服务，使用redis管道连接功能提高遍历效率
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-remark/redisopt.png)
+---
+### ER图
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-remark/whiteboard_exported_image-2.png)
+---
+### Mq问题
+我在调试用户点赞后更新远程微服务点赞数量的时候出现了以下报错
+```
+message_id:	121fc91d-0753-49c9-8da8-3a15aa91b5ce
+priority:	0
+delivery_mode:	2
+headers:	
+__ContentTypeId__:	java.lang.Object
+__TypeId__:	java.util.ArrayList
+requestId:	dfce9a6002c544499792d8e5c1e453bd
+x-exception-message:	Failed to convert Message content
+x-exception-stacktrace:	org.springframework.amqp.rabbit.support.ListenerExecutionFailedException: Failed to convert message
+at org.springframework.amqp.rabbit.listener.adapter.MessagingMessageListenerAdapter.onMessage(MessagingMessageListenerAdapter.java:156)
+at org.springframework.amqp.rabbit.listener.AbstractMessageListenerContainer.doInvokeListener(AbstractMessageListenerContainer.java:1670)
+at org.springframework.amqp.rabbit.listener.AbstractMessageListenerContainer.actualInvokeListener(AbstractMessageListenerContainer.java:1589)
+at jdk.internal.reflect.GeneratedMethodAccessor197.invoke(Unknown Source)
+at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(Unknown Source)
+at java.base/java.lang.reflect.Method.invoke(Unknown Source)
+at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:344)
+at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:198)
+at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:163)
+at org.springframework.retry.interceptor.RetryOperationsInterceptor$1.doWithRetry(RetryOperationsInterceptor.java:97)
+at org.springframework.retry.support.RetryTemplate.doExecute(RetryTemplate.java:329)
+at org.springframework.retry.support.RetryTemplate.execute(RetryTemplate.java:225)
+at org.springframework.retry.interceptor.RetryOperationsInterceptor.invoke(RetryOperationsInterceptor.java:122)
+at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:186)
+at org.springframework.aop.framework.JdkDynamicAopProxy.invoke(JdkDynamicAopProxy.java:215)
+at org.springframework.amqp.rabbit.listener.$Proxy204.invokeListener(Unknown Source)
+at org.springframework.amqp.rabbit.listener.AbstractMessageListenerContainer.invokeListener(AbstractMessageListenerContainer.java:1577)
+at org.springframework.amqp.rabbit.listener.AbstractMessageListenerContainer.doExecuteListener(AbstractMessageListenerContainer.java:1568)
+at org.springframework.amqp.rabbit.listener.AbstractMessageListenerContainer.executeListener(AbstractMessageListenerContainer.java:1512)
+at org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer.doReceiveAndExecute(SimpleMessageListenerContainer.java:993)
+at org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer.receiveAndExecute(SimpleMessageListenerContainer.java:940)
+at org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer.access$1600(SimpleMessageListenerContainer.java:84)
+at org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer$AsyncMessageProcessingConsumer.mainLoop(SimpleMessageListenerContainer.java:1317)
+at org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer$AsyncMessageProcessingConsumer.run(SimpleMessageListenerContainer.java:1223)
+at java.base/java.lang.Thread.run(Unknown Source)
+Caused by: org.springframework.amqp.support.converter.MessageConversionException: Failed to convert Message content
+at org.springframework.amqp.support.converter.AbstractJackson2MessageConverter.doFromMessage(AbstractJackson2MessageConverter.java:350)
+at org.springframework.amqp.support.converter.AbstractJackson2MessageConverter.fromMessage(AbstractJackson2MessageConverter.java:309)
+at org.springframework.amqp.support.converter.AbstractJackson2MessageConverter.fromMessage(AbstractJackson2MessageConverter.java:292)
+at org.springframework.amqp.rabbit.listener.adapter.AbstractAdaptableMessageListener.extractMessage(AbstractAdaptableMessageListener.java:342)
+at org.springframework.amqp.rabbit.listener.adapter.MessagingMessageListenerAdapter$MessagingMessageConverterAdapter.extractPayload(MessagingMessageListenerAdapter.java:366)
+at org.springframework.amqp.support.converter.MessagingMessageConverter.fromMessage(MessagingMessageConverter.java:132)
+at org.springframework.amqp.rabbit.listener.adapter.MessagingMessageListenerAdapter.toMessagingMessage(MessagingMessageListenerAdapter.java:243)
+at org.springframework.amqp.rabbit.listener.adapter.MessagingMessageListenerAdapter.onMessage(MessagingMessageListenerAdapter.java:146)
+... 24 more
+Caused by: com.fasterxml.jackson.databind.exc.MismatchedInputException: Cannot deserialize value of type `com.tianji.api.dto.remark.LikedTimesDTO` from Array value (token `JsonToken.START_ARRAY`)
+at [Source: (String)"[{"bizId":"1588103282121805825","likedTimes":1}]"; line: 1, column: 1]
+at com.fasterxml.jackson.databind.exc.MismatchedInputException.from(MismatchedInputException.java:59)
+at com.fasterxml.jackson.databind.DeserializationContext.reportInputMismatch(DeserializationContext.java:1741)
+at com.fasterxml.jackson.databind.DeserializationContext.handleUnexpectedToken(DeserializationContext.java:1515)
+at com.fasterxml.jackson.databind.DeserializationContext.handleUnexpectedToken(DeserializationContext.java:1462)
+at com.fasterxml.jackson.databind.deser.BeanDeserializer._deserializeFromArray(BeanDeserializer.java:638)
+at com.fasterxml.jackson.databind.deser.BeanDeserializer._deserializeOther(BeanDeserializer.java:210)
+at com.fasterxml.jackson.databind.deser.BeanDeserializer.deserialize(BeanDeserializer.java:186)
+at com.fasterxml.jackson.databind.deser.DefaultDeserializationContext.readRootValue(DefaultDeserializationContext.java:323)
+at com.fasterxml.jackson.databind.ObjectMapper._readMapAndClose(ObjectMapper.java:4674)
+at com.fasterxml.jackson.databind.ObjectMapper.readValue(ObjectMapper.java:3629)
+at org.springframework.amqp.support.converter.AbstractJackson2MessageConverter.convertBytesToObject(AbstractJackson2MessageConverter.java:411)
+at org.springframework.amqp.support.converter.AbstractJackson2MessageConverter.convertContent(AbstractJackson2MessageConverter.java:378)
+at org.springframework.amqp.support.converter.AbstractJackson2MessageConverter.doFromMessage(AbstractJackson2MessageConverter.java:347)
+... 31 more
+x-original-exchange:	like.record.topic
+x-original-routingKey:	QA.times.changed
+```
+调试的时候我发现一个很奇异的现象：发送MQ请求无法更新点赞数量，但是偶然又能成功更新数据库，让我百思不得其解  
+起初我查看error消息队列有新增异常的时候返回来看idea控制台learning服务并没有打印任何东西，我以为类型转换错误不会打印消息会直接走`MessageRecoverer`，思来想去半个多小时突然想到**MQ好像不依赖nacos**，所以出现这个问题的原因是我本地写的代码没有推送到服务器上更新服务器上的服务，**即使我在nacos让服务下线，但该服务的MQ还是能正常进行消费**，这也解释了为什么前面偶然能成功更新而有时候又不行，是因为部分走了服务器上的消费者而部分走了本地服务  
+*我还一直以为是我序列化有问题🤦 记录一下这半个多小时的折腾吧哈哈*
+## 积分系统

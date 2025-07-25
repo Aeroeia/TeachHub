@@ -1,6 +1,7 @@
 package com.teachub.api.config;
 
 import com.teachub.api.client.learning.fallback.LearningClientFallback;
+import com.teachub.api.client.remark.fallback.RemarkClientFallBackFactory;
 import com.teachub.api.client.trade.fallback.TradeClientFallback;
 import com.teachub.api.client.user.fallback.UserClientFallback;
 import org.springframework.context.annotation.Bean;
@@ -22,5 +23,11 @@ public class FallbackConfig {
     public UserClientFallback userClientFallback(){
         return new UserClientFallback();
     }
+
+    @Bean
+    public RemarkClientFallBackFactory remarkClientFallBackFactory(){
+        return new RemarkClientFallBackFactory();
+    }
+
 
 }
