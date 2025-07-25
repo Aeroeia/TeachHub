@@ -15,5 +15,6 @@ public class LikedTimesDTO {
     /**
      * 总的点赞次数
      */
-    private Boolean isLiked;
+    private Integer likedTimes;
+
 }

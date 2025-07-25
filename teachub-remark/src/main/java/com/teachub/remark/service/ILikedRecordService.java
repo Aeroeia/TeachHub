@@ -21,4 +21,7 @@ public interface ILikedRecordService extends IService<LikedRecord> {
 
     Set<Long> getBatchLiked(List<Long> bizIds);
 
+    void readLikedTimesAndSendMsg(String type, Integer maxBizSize);
+
+
 }
