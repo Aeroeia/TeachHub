@@ -322,7 +322,18 @@ private  ILearningRecordService learningRecordService;
 - Redis不存在，再去查询数据库。
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day05/whiteboard_exported_image.png)
 ## 点赞系统
+### 业务流程
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-remark/whiteboard_exported_image.png)
+该业务可以采用以下思路进行实现:
+1. 用户点赞后查询Redis是否存在该用户点赞记录(set)，若存在则直接返回，不存在则在redis新增点赞记录(zset)，采用定时任务，定期将数据通过mq发送到对应业务微服务更新点赞数量，同时清除zset中的数据  
+2. 查询用户是否点赞远程微服务通过feign接口调用remark服务，使用redis管道连接功能提高遍历效率
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-remark/redisopt.png)
+---
+### ER图
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-remark/whiteboard_exported_image-2.png)
+---
 ### Mq问题
+我在调试用户点赞后更新远程微服务点赞数量的时候出现了以下报错
 ```
 message_id:	121fc91d-0753-49c9-8da8-3a15aa91b5ce
 priority:	0
@@ -387,3 +398,7 @@ at org.springframework.amqp.support.converter.AbstractJackson2MessageConverter.d
 x-original-exchange:	like.record.topic
 x-original-routingKey:	QA.times.changed
 ```
+调试的时候我发现一个很奇异的现象：发送MQ请求无法更新点赞数量，但是偶然又能成功更新数据库，让我百思不得其解  
+起初我查看error消息队列有新增异常的时候返回来看idea控制台learning服务并没有打印任何东西，我以为类型转换错误不会打印消息会直接走`MessageRecoverer`，思来想去半个多小时突然想到**MQ好像不依赖nacos**，所以出现这个问题的原因是我本地写的代码没有推送到服务器上更新服务器上的服务，**即使我在nacos让服务下线，但该服务的MQ还是能正常进行消费**，这也解释了为什么前面偶然能成功更新而有时候又不行，是因为部分走了服务器上的消费者而部分走了本地服务  
+*我还一直以为是我序列化有问题🤦 记录一下这半个多小时的折腾吧哈哈*
+## 积分系统
