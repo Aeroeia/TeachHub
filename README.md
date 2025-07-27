@@ -402,3 +402,63 @@ x-original-routingKey:	QA.times.changed
 起初我查看error消息队列有新增异常的时候返回来看idea控制台learning服务并没有打印任何东西，我以为类型转换错误不会打印消息会直接走`MessageRecoverer`，思来想去半个多小时突然想到**MQ好像不依赖nacos**，所以出现这个问题的原因是我本地写的代码没有推送到服务器上更新服务器上的服务，**即使我在nacos让服务下线，但该服务的MQ还是能正常进行消费**，这也解释了为什么前面偶然能成功更新而有时候又不行，是因为部分走了服务器上的消费者而部分走了本地服务  
 *我还一直以为是我序列化有问题🤦 记录一下这半个多小时的折腾吧哈哈*
 ## 积分系统
+### 接口设计
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day07/1.png)
+---
+### 数据库ER图
+#### 签到记录
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day07/whiteboard_exported_image.png)
+#### 积分记录
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day07/whiteboard_exported_image-2.png)
+#### 排行榜
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day07/whiteboard_exported_image-3.png)
+---
+### 签到功能实现--BitMap
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day07/sign.png)
+我们知道二进制是计算机底层最基础的存储方式了，其中的每一位数字就是计算机信息量的最小单位了，称之为bit，一个月最多也就 31 天，因此一个月的签到记录最多也就使用 31 bit 就能保存了，还不到 4 个字节。
+而如果用到我们前面讲的数据库方式来保存相同数据，则要使用数百字节，是这种方式的上百倍都不止。
+可见，这种用二进制位保存签到记录的方式，是不是非常高效啊！
+
+像这种把每一个二进制位，与某些业务数据一一映射（本例中是与一个月的每一天映射），然后用二进制位上的数字0和1来标识业务状态的思路，称为位图。也叫做BitMap.
+
+这种数据统计的方式非常节省空间，因此经常用来做各种数据统计。比如大名鼎鼎的布隆过滤器就是基于BitMap来实现的。
+
+OK，那么利用BitMap我们就能直接实现签到功能，并且非常节省内存，还很高效。所以就无需通过数据库来操作了。
+>BitMap用法合集:https://redis.io/docs/latest/commands/ 
+
+**BitMap基本用法**
+```java
+ @Autowired
+    private StringRedisTemplate redisTemplate;
+    @Test
+    //bitset
+    void bitSet(){
+        Boolean b = redisTemplate.opsForValue().setBit("test", 1, true);
+        System.out.println(b);
+    }
+
+    @Test
+    //bitget
+    void bitGet(){
+        //返回bitfield集合
+        List<Long> longs = redisTemplate.opsForValue().bitField("test",
+                BitFieldSubCommands.create().get(BitFieldSubCommands.
+                //获取位数
+                BitFieldType.unsigned(3))
+                //从0索引开始
+                .valueAt(0));
+        Long l = longs.get(0);
+        System.out.println(Long.toBinaryString(l));
+    }
+```
+>Redis最基础的数据类型只有5种：String、List、Set、SortedSet、Hash，其它特殊数据结构大多都是基于以上5这种数据类型。
+BitMap也不例外，它是基于String结构的。因为Redis的String类型底层是SDS，也会存在一个字节数组用来保存数据。而Redis就提供了几个按位操作这个数组中数据的命令，实现了BitMap效果。  
+由于String类型的最大空间是512MB，也就是2的31次幂个bit，因此可以保存的数据量级是十分恐怖的
+---
+### 积分功能
+由积分规则可知，获取积分的行为多种多样，而且每一种行为都有自己的独立业务。而这些行为产生的时候需要保存一条积分明细到数据库。
+我们显然不能要求其它业务的开发者在开发时帮我们新增一条积分记录，这样会导致原有业务与积分业务耦合。因此必须采用异步方式，将原有业务与积分业务解耦。
+如果有必要，甚至可以将积分业务抽离，作为独立微服务。
+
+**该业务我们使用MQ进行解耦**
+![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day07/whiteboard_exported_image-4.png)
