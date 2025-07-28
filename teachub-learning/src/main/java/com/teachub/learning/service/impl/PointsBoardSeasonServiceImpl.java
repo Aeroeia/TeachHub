@@ -2,6 +2,7 @@ package com.teachub.learning.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.teachub.common.utils.BeanUtils;
+import com.teachub.learning.constants.LearningConstants;
 import com.teachub.learning.domain.po.PointsBoardSeason;
 import com.teachub.learning.domain.vo.PointsBoardSeasonVO;
 import com.teachub.learning.mapper.PointsBoardSeasonMapper;
@@ -25,5 +26,10 @@ public class PointsBoardSeasonServiceImpl extends ServiceImpl<PointsBoardSeasonM
     public List<PointsBoardSeasonVO> querySeasons() {
         List<PointsBoardSeason> list = this.list();
         return BeanUtils.copyList(list, PointsBoardSeasonVO.class);
+    }
+
+    @Override
+    public void createSeasonTable(Integer id) {
+        this.getBaseMapper().createTable(LearningConstants.POINTS_BOARD_TABLE_PREFIX+id);
     }
 }

@@ -462,3 +462,5 @@ BitMap也不例外，它是基于String结构的。因为Redis的String类型底
 
 **该业务我们使用MQ进行解耦**
 ![](https://jiangdata.oss-cn-guangzhou.aliyuncs.com/tjxt/tj-learning/day07/whiteboard_exported_image-4.png)
+## 排行榜
+### 分区分表
