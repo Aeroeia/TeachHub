@@ -1,23 +1,26 @@
 package com.teachub.learning.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.teachub.common.exceptions.BadRequestException;
 import com.teachub.common.utils.CollUtils;
 import com.teachub.common.utils.UserContext;
+import com.teachub.learning.constants.RedisConstant;
 import com.teachub.learning.domain.po.PointsRecord;
 import com.teachub.learning.domain.vo.PointsStatisticsVO;
 import com.teachub.learning.enums.PointsRecordType;
 import com.teachub.learning.mapper.PointsRecordMapper;
 import com.teachub.learning.mq.msg.SignInMessage;
 import com.teachub.learning.service.IPointsRecordService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,7 +34,9 @@ import java.util.List;
  */
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class PointsRecordServiceImpl extends ServiceImpl<PointsRecordMapper, PointsRecord> implements IPointsRecordService {
+    private final StringRedisTemplate redisTemplate;
     @Override
     public void addPoints(SignInMessage signInMessage, PointsRecordType pointsRecordType) {
         //查询积分是否有上限
@@ -61,6 +66,11 @@ public class PointsRecordServiceImpl extends ServiceImpl<PointsRecordMapper, Poi
                 .setType(pointsRecordType)
                 .setUserId(signInMessage.getUserId());
         this.save(record);
+        //累加保存积分值到redis
+        String format = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
+        String key = RedisConstant.POINTS_BOARD_KEY_PREFIX+format;
+        //累加积分
+        redisTemplate.opsForZSet().incrementScore(key,signInMessage.getUserId().toString(),addPoints);
     }
 
     @Override
@@ -90,4 +100,5 @@ public class PointsRecordServiceImpl extends ServiceImpl<PointsRecordMapper, Poi
         }
         return result;
     }
+
 }
