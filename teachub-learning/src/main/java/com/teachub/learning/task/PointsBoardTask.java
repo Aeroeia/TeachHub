@@ -7,17 +7,14 @@ import com.teachub.learning.domain.po.PointsBoard;
 import com.teachub.learning.domain.po.PointsBoardSeason;
 import com.teachub.learning.service.IPointsBoardSeasonService;
 import com.teachub.learning.service.IPointsBoardService;
+import com.teachub.learning.utils.TableInfoContext;
+import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.handler.annotation.XxlJob;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 @Slf4j
@@ -62,14 +59,15 @@ public class PointsBoardTask {
         String format = RedisConstant.POINTS_BOARD_KEY_PREFIX+LocalDate.now().minusMonths(1).format(DateTimeFormatter.ofPattern("yyyyMM"));
         log.info("key为:{}",format);
         //分页查询redis减缓压力
-        int pageNo = 1;
+        //通过集群xxl-job分片加快持久化速度
+        int shardTotal = XxlJobHelper.getShardTotal();
+        int pageNo = XxlJobHelper.getShardIndex();
         int pageSize = 1000;
         while(true){
             List<PointsBoard> pointsBoards = pointsBoardService.queryBoardList(format, pageSize, pageNo);
             if(CollUtils.isEmpty(pointsBoards)){
                 break;
             }
-            pageNo++;
             //将rank转移到id后db批量新增
             for(PointsBoard pointsBoard : pointsBoards){
                 pointsBoard.setId(pointsBoard.getRank().longValue());
@@ -77,6 +75,7 @@ public class PointsBoardTask {
             }
             log.info("数据:{}",pointsBoards);
             pointsBoardService.saveBatch(pointsBoards);
+            pageNo+=shardTotal;
         }
         //清空ThreadLocal
         TableInfoContext.remove();
