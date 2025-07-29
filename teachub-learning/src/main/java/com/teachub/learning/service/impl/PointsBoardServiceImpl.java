@@ -86,7 +86,7 @@ public class PointsBoardServiceImpl extends ServiceImpl<PointsBoardMapper, Point
     }
 
     //分页查询当前月榜单
-    private List<PointsBoard> queryBoardList(String key, Integer pageSize, Integer pageNo) {
+    public List<PointsBoard> queryBoardList(String key, Integer pageSize, Integer pageNo) {
         //构建分页条件
         int start = (pageNo - 1) * pageSize;
         int end = start + pageSize - 1;
