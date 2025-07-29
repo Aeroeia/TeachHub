@@ -12,8 +12,10 @@ import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.handler.annotation.XxlJob;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -23,6 +25,7 @@ import java.util.List;
 public class PointsBoardTask {
     private final IPointsBoardSeasonService pointsBoardSeasonService;
     private final IPointsBoardService pointsBoardService;
+    private final StringRedisTemplate redisTemplate;
     @XxlJob("createTableJob")
     public void createPointBoardTable(){
         log.info("将上赛季数据写入数据库");
@@ -79,5 +82,15 @@ public class PointsBoardTask {
         }
         //清空ThreadLocal
         TableInfoContext.remove();
+    }
+    //清空redis缓存
+    @XxlJob("clearPointsBoardFromRedis")
+    public void clearPointsBoardFromRedis(){
+        // 1.获取上月时间
+        LocalDateTime time = LocalDateTime.now().minusMonths(1);
+        // 2.计算key
+        String key = RedisConstant.POINTS_BOARD_KEY_PREFIX+LocalDate.now().minusMonths(1).format(DateTimeFormatter.ofPattern("yyyyMM"));
+        // 3.删除 del同步删除 unlink异步删除
+        redisTemplate.unlink(key);
     }
 }
