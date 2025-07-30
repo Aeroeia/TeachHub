@@ -1,8 +1,12 @@
 package com.teachub.promotion.domain.po;
 
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
+import java.time.LocalDateTime;
+import java.io.Serializable;
+
 import com.teachub.promotion.enums.CouponStatus;
 import com.teachub.promotion.enums.DiscountType;
 import com.teachub.promotion.enums.ObtainType;
@@ -11,9 +15,6 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
-
-import java.io.Serializable;
-import java.time.LocalDateTime;
 
 /**
  * <p>
@@ -46,6 +47,7 @@ public class Coupon implements Serializable {
     private DiscountType discountType;
 
     @ApiModelProperty(value = "是否限定作用范围，false：不限定，true：限定。默认false")
+    @TableField("`specific`")
     private Boolean specific;
 
     @ApiModelProperty(value = "折扣值，如果是满减则存满减金额，如果是折扣，则存折扣率，8折就是存80")
@@ -100,7 +102,7 @@ public class Coupon implements Serializable {
     private LocalDateTime updateTime;
 
     @ApiModelProperty(value = "创建人")
-    private Long creator;
+    private Long creater;
 
     @ApiModelProperty(value = "更新人")
     private Long updater;
