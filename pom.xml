@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.teachub</groupId>
-    <artifactId>teachub</artifactId>
+    <artifactId>TeachHub</artifactId>
     <version>1.0.0</version>
     <modules>
         <module>teachub-common</module>
@@ -23,6 +23,7 @@
         <module>teachub-exam</module>
         <module>teachub-data</module>
         <module>teachub-remark</module>
+        <module>teachub-promotion</module>
     </modules>
     <packaging>pom</packaging>
 
