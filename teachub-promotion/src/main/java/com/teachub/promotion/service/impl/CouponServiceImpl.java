@@ -1,13 +1,13 @@
 package com.teachub.promotion.service.impl;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.teachub.common.domain.dto.PageDTO;
 import com.teachub.common.exceptions.BadRequestException;
 import com.teachub.common.exceptions.BizIllegalException;
 import com.teachub.common.utils.BeanUtils;
 import com.teachub.common.utils.CollUtils;
-import com.teachub.common.utils.StringUtils;
 import com.teachub.promotion.domain.dto.CouponFormDTO;
 import com.teachub.promotion.domain.dto.CouponIssueFormDTO;
 import com.teachub.promotion.domain.dto.CouponQuery;
@@ -15,13 +15,16 @@ import com.teachub.promotion.domain.po.Coupon;
 import com.teachub.promotion.domain.po.CouponScope;
 import com.teachub.promotion.domain.vo.CouponPageVO;
 import com.teachub.promotion.enums.CouponStatus;
+import com.teachub.promotion.enums.ObtainType;
 import com.teachub.promotion.mapper.CouponMapper;
 import com.teachub.promotion.service.ICouponScopeService;
 import com.teachub.promotion.service.ICouponService;
+import com.teachub.promotion.service.IExchangeCodeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,7 +42,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> implements ICouponService {
     private final ICouponScopeService couponScopeService;
-
+    private final IExchangeCodeService codeService;
     //新增优惠券
     @Transactional
     @Override
@@ -78,11 +81,11 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
                 .like(StringUtils.isNotBlank(query.getName()), Coupon::getName, query.getName())
                 .page(query.toMpPageDefaultSortByCreateTimeDesc());
         List<Coupon> records = page.getRecords();
-        if(CollUtils.isEmpty(records)){
+        if (CollUtils.isEmpty(records)) {
             return PageDTO.empty(page);
         }
         List<CouponPageVO> couponPageVOS = BeanUtils.copyList(records, CouponPageVO.class);
-        return PageDTO.of(page,couponPageVOS);
+        return PageDTO.of(page, couponPageVOS);
     }
 
     @Override
@@ -112,5 +115,9 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
         this.updateById(coupon);
 
         //TODO 如果兑换方式是指定发放 要生成兑换码
+        if(one.getObtainWay().equals(ObtainType.ISSUE)&&one.getStatus().equals(CouponStatus.DRAFT)){
+            one.setTermEndTime(coupon.getTermEndTime());
+            codeService.asyncCreateCode(one);
+        }
     }
 }
