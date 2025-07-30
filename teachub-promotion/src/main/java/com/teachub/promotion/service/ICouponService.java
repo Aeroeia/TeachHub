@@ -1,8 +1,11 @@
 package com.teachub.promotion.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.teachub.common.domain.dto.PageDTO;
 import com.teachub.promotion.domain.dto.CouponFormDTO;
+import com.teachub.promotion.domain.dto.CouponQuery;
 import com.teachub.promotion.domain.po.Coupon;
+import com.teachub.promotion.domain.vo.CouponPageVO;
 
 /**
  * <p>
@@ -15,4 +18,6 @@ import com.teachub.promotion.domain.po.Coupon;
 public interface ICouponService extends IService<Coupon> {
 
     void addCoupon(CouponFormDTO coupon);
+
+    PageDTO<CouponPageVO> queryCouponPage(CouponQuery query);
 }

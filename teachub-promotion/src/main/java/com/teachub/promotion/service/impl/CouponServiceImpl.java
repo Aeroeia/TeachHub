@@ -1,12 +1,17 @@
 package com.teachub.promotion.service.impl;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.teachub.common.domain.dto.PageDTO;
 import com.teachub.common.exceptions.BadRequestException;
 import com.teachub.common.utils.BeanUtils;
 import com.teachub.common.utils.CollUtils;
+import com.teachub.common.utils.StringUtils;
 import com.teachub.promotion.domain.dto.CouponFormDTO;
+import com.teachub.promotion.domain.dto.CouponQuery;
 import com.teachub.promotion.domain.po.Coupon;
 import com.teachub.promotion.domain.po.CouponScope;
+import com.teachub.promotion.domain.vo.CouponPageVO;
 import com.teachub.promotion.mapper.CouponMapper;
 import com.teachub.promotion.service.ICouponScopeService;
 import com.teachub.promotion.service.ICouponService;
@@ -31,6 +36,7 @@ import java.util.stream.Collectors;
 public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> implements ICouponService {
     private final ICouponScopeService couponScopeService;
 
+    //新增优惠券
     @Transactional
     @Override
     public void addCoupon(CouponFormDTO coupon) {
@@ -57,5 +63,21 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
         }).collect(Collectors.toList());
         //新增优惠券范围
         couponScopeService.saveBatch(list);
+    }
+
+    //分页查询优惠券
+    @Override
+    public PageDTO<CouponPageVO> queryCouponPage(CouponQuery query) {
+        Page<Coupon> page = this.lambdaQuery()
+                .eq(query.getType() != null, Coupon::getType, query.getType())
+                .eq(query.getStatus() != null, Coupon::getStatus, query.getStatus())
+                .like(StringUtils.isNotBlank(query.getName()), Coupon::getName, query.getName())
+                .page(query.toMpPageDefaultSortByCreateTimeDesc());
+        List<Coupon> records = page.getRecords();
+        if(CollUtils.isEmpty(records)){
+            return PageDTO.empty(page);
+        }
+        List<CouponPageVO> couponPageVOS = BeanUtils.copyList(records, CouponPageVO.class);
+        return PageDTO.of(page,couponPageVOS);
     }
 }
