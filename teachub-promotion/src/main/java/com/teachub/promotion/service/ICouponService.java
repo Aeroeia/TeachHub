@@ -30,4 +30,6 @@ public interface ICouponService extends IService<Coupon> {
     CouponDetailVO queryCouponDetail(Long id);
 
     void delete(Long id);
+
+    void pauseCoupon(Long id);
 }

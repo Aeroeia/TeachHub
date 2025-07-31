@@ -78,4 +78,11 @@ public class CouponController {
         log.info("删除优惠券");
         couponService.delete(id);
     }
+    @ApiOperation("暂停发放优惠券")
+    @PutMapping("/{id}/pause")
+    public void pauseCoupon(@PathVariable Long id) {
+        log.info("暂停发放优惠券");
+        couponService.pauseCoupon(id);
+    }
+
 }
