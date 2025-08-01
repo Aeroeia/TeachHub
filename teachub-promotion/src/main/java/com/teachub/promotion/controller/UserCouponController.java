@@ -24,4 +24,10 @@ public class UserCouponController {
         log.info("用户领取优惠券，id：{}", id);
         userCouponService.receiveCoupon(id);
     }
+    @PostMapping("/{code}/exchange")
+    @ApiOperation("兑换码兑换优惠券")
+    public void exchangeCode(@PathVariable String code) {
+        log.info("用户兑换码兑换优惠券，id：{}", code);
+        userCouponService.exchangeCode(code);
+    }
 }
