@@ -13,4 +13,5 @@ import com.teachub.promotion.domain.po.UserCoupon;
  */
 public interface IUserCouponService extends IService<UserCoupon> {
 
+    void receiveCoupon(Long id);
 }

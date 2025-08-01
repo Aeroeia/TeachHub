@@ -2,6 +2,7 @@ package com.teachub.promotion.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.teachub.promotion.domain.po.Coupon;
+import org.apache.ibatis.annotations.Update;
 
 /**
  * <p>
@@ -12,5 +13,6 @@ import com.teachub.promotion.domain.po.Coupon;
  * @since 2025-07-30
  */
 public interface CouponMapper extends BaseMapper<Coupon> {
-
+    @Update("update coupon set issue_num = issue_num+1 where id = #{id}")
+    void updateIssueNum(Long id);
 }
