@@ -10,21 +10,26 @@ import com.teachub.common.exceptions.BizIllegalException;
 import com.teachub.common.utils.BeanUtils;
 import com.teachub.common.utils.CollUtils;
 import com.teachub.common.utils.StringUtils;
+import com.teachub.common.utils.UserContext;
 import com.teachub.promotion.domain.dto.CouponFormDTO;
 import com.teachub.promotion.domain.dto.CouponIssueFormDTO;
 import com.teachub.promotion.domain.dto.CouponQuery;
 import com.teachub.promotion.domain.po.Coupon;
 import com.teachub.promotion.domain.po.CouponScope;
 import com.teachub.promotion.domain.po.ExchangeCode;
+import com.teachub.promotion.domain.po.UserCoupon;
 import com.teachub.promotion.domain.vo.CouponDetailVO;
 import com.teachub.promotion.domain.vo.CouponPageVO;
 import com.teachub.promotion.domain.vo.CouponScopeVO;
+import com.teachub.promotion.domain.vo.CouponVO;
 import com.teachub.promotion.enums.CouponStatus;
 import com.teachub.promotion.enums.ObtainType;
+import com.teachub.promotion.enums.UserCouponStatus;
 import com.teachub.promotion.mapper.CouponMapper;
 import com.teachub.promotion.service.ICouponScopeService;
 import com.teachub.promotion.service.ICouponService;
 import com.teachub.promotion.service.IExchangeCodeService;
+import com.teachub.promotion.service.IUserCouponService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,6 +40,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -53,7 +59,7 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
     private final ICouponScopeService couponScopeService;
     private final IExchangeCodeService codeService;
     private final CategoryClient categoryClient;
-
+    private final IUserCouponService userCouponService;
     //新增优惠券
     @Transactional
     @Override
@@ -202,4 +208,45 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
                 .set(Coupon::getStatus, CouponStatus.PAUSE)
                 .update();
     }
+
+    //查询发放中的优惠券
+    @Override
+    public List<CouponVO> queryList() {
+        Long userId = UserContext.getUser();
+        if (userId == null) {
+            throw new BadRequestException("用户登陆状态异常");
+        }
+        //查询db发放中且为手动领取的优惠券
+        List<Coupon> list = this.lambdaQuery().
+                eq(Coupon::getStatus, CouponStatus.ISSUING)
+                .eq(Coupon::getObtainWay, ObtainType.PUBLIC)
+                .list();
+        if (CollUtils.isEmpty(list)) {
+            return List.of();
+        }
+        Set<Long> couponIds = list.stream().map(Coupon::getId).collect(Collectors.toSet());
+        //查看当前用户所领过的券
+        List<UserCoupon> myCoupons = userCouponService.lambdaQuery()
+                .eq(UserCoupon::getUserId, userId)
+                .in(UserCoupon::getCouponId, couponIds)
+                .list();
+        //查询优惠券用户用了的次数
+        Map<Long, Long> couponMap = myCoupons.stream().
+                collect(Collectors.groupingBy(UserCoupon::getCouponId, Collectors.counting()));
+        //未使用的券
+        Map<Long, Long> unusedCouponMap = myCoupons.stream().
+                filter(coupon -> coupon.getStatus() == UserCouponStatus.UNUSED).
+                collect(Collectors.groupingBy(UserCoupon::getCouponId, Collectors.counting()));
+        //过滤掉超出上限且被领取过的券
+        return list.stream().map(po -> {
+            CouponVO couponVO = BeanUtils.copyBean(po, CouponVO.class);
+            //优惠券是否超出领取上限
+            boolean isAvl = po.getIssueNum() < po.getTotalNum() && couponMap.getOrDefault(po.getId(),0L) < po.getUserLimit();
+            couponVO.setAvailable(isAvl);
+            boolean isRec = unusedCouponMap.getOrDefault(po.getId(), 0L)>0;
+            couponVO.setReceived(isRec);
+            return couponVO;
+        }).collect(Collectors.toList());
+    }
+
 }
