@@ -17,6 +17,7 @@ import com.teachub.promotion.domain.po.UserCoupon;
 import com.teachub.promotion.domain.vo.CouponVO;
 import com.teachub.promotion.enums.CouponStatus;
 import com.teachub.promotion.enums.ExchangeCodeStatus;
+import com.teachub.promotion.enums.MyLockType;
 import com.teachub.promotion.enums.UserCouponStatus;
 import com.teachub.promotion.mapper.CouponMapper;
 import com.teachub.promotion.mapper.UserCouponMapper;
@@ -50,9 +51,8 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
     private final RedissonClient redissonClient;
 
     @Override
-    @MyLock()
+    @MyLock(lockType = MyLockType.RE_ENTRANT_LOCK)
     public void receiveCoupon(Long id) {
-        Long userId = UserContext.getUser();
         //从aop上下文获取代理对象
         IUserCouponService iUserCouponService = (IUserCouponService) AopContext.currentProxy();
         iUserCouponService.receiveCopy(id);
