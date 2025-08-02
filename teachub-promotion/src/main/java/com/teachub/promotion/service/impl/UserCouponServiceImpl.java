@@ -17,6 +17,7 @@ import com.teachub.promotion.service.IExchangeCodeService;
 import com.teachub.promotion.service.IUserCouponService;
 import com.teachub.promotion.utils.CodeUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.aop.framework.AopContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -49,7 +50,9 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
         //悲观锁
         //Long比对会有问题 转为String调用intern强调从常量池中取对象
         synchronized (userId.toString().intern()) {
-            userCouponService.receiveCopy(id);
+            //从aop上下文获取代理对象
+            IUserCouponService iUserCouponService = (IUserCouponService) AopContext.currentProxy();
+            iUserCouponService.receiveCopy(id);
         }
     }
 
