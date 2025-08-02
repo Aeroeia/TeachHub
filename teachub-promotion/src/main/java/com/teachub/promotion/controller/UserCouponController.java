@@ -1,14 +1,14 @@
 package com.teachub.promotion.controller;
 
+import com.teachub.common.domain.dto.PageDTO;
+import com.teachub.promotion.domain.dto.CouponQuery;
+import com.teachub.promotion.domain.vo.CouponVO;
 import com.teachub.promotion.service.IUserCouponService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @Api(tags = "用户优惠券接口")
@@ -29,5 +29,12 @@ public class UserCouponController {
     public void exchangeCode(@PathVariable String code) {
         log.info("用户兑换码兑换优惠券，id：{}", code);
         userCouponService.exchangeCode(code);
+    }
+
+    @ApiOperation("查询我的优惠券")
+    @GetMapping("/page")
+    public PageDTO<CouponVO> queryMyCoupons(CouponQuery couponQuery){
+        log.info("查询我的优惠券：{}", couponQuery);
+        return userCouponService.queryMyCoupons(couponQuery);
     }
 }

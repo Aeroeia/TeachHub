@@ -1,13 +1,19 @@
 package com.teachub.promotion.service.impl;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.teachub.common.domain.dto.PageDTO;
 import com.teachub.common.exceptions.BadRequestException;
 import com.teachub.common.exceptions.BizIllegalException;
+import com.teachub.common.utils.BeanUtils;
+import com.teachub.common.utils.CollUtils;
 import com.teachub.common.utils.StringUtils;
 import com.teachub.common.utils.UserContext;
+import com.teachub.promotion.domain.dto.CouponQuery;
 import com.teachub.promotion.domain.po.Coupon;
 import com.teachub.promotion.domain.po.ExchangeCode;
 import com.teachub.promotion.domain.po.UserCoupon;
+import com.teachub.promotion.domain.vo.CouponVO;
 import com.teachub.promotion.enums.CouponStatus;
 import com.teachub.promotion.enums.ExchangeCodeStatus;
 import com.teachub.promotion.enums.UserCouponStatus;
@@ -18,14 +24,14 @@ import com.teachub.promotion.service.IUserCouponService;
 import com.teachub.promotion.utils.CodeUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.aop.framework.AopContext;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * <p>
@@ -91,6 +97,7 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
         this.saveCoupon(coupon);
     }
 
+
     //兑换码兑换优惠券
     @Transactional
     @Override
@@ -139,5 +146,33 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
             userCoupon.setTermEndTime(coupon.getTermEndTime());
         }
         this.save(userCoupon);
+    }
+    //查询我的优惠券
+    @Override
+    public PageDTO<CouponVO> queryMyCoupons(CouponQuery couponQuery) {
+        Long userId = UserContext.getUser();
+        if(userId==null){
+            throw new BadRequestException("用户未登陆");
+        }
+        Page<UserCoupon> page = this.lambdaQuery()
+                .eq(UserCoupon::getUserId, userId)
+                .eq(UserCoupon::getStatus, couponQuery.getStatus())
+                .page(couponQuery.toMpPageDefaultSortByCreateTimeDesc());
+        List<UserCoupon> records = page.getRecords();
+        if(CollUtils.isEmpty(records)){
+            return PageDTO.empty(page);
+        }
+        Set<Long> collect = records.stream().map(UserCoupon::getCouponId).collect(Collectors.toSet());
+        List<Coupon> coupons = couponMapper.selectBatchIds(collect);
+        Map<Long, Coupon> map = coupons.stream().collect(Collectors.toMap(Coupon::getId, u -> u));
+        List<CouponVO> result = records.stream().map(po -> {
+            Long couponId = po.getCouponId();
+            Coupon coupon = map.get(couponId);
+            CouponVO couponVO = BeanUtils.copyBean(coupon, CouponVO.class);
+            couponVO.setTermEndTime(po.getTermEndTime());
+            return couponVO;
+        }).collect(Collectors.toList());
+        return PageDTO.of(page, result);
+
     }
 }
