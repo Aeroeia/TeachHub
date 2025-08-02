@@ -1,5 +1,6 @@
 package com.teachub.promotion.service.impl;
 
+import com.alibaba.cloud.commons.lang.StringUtils;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.teachub.common.domain.dto.PageDTO;
@@ -7,7 +8,6 @@ import com.teachub.common.exceptions.BadRequestException;
 import com.teachub.common.exceptions.BizIllegalException;
 import com.teachub.common.utils.BeanUtils;
 import com.teachub.common.utils.CollUtils;
-import com.teachub.common.utils.StringUtils;
 import com.teachub.common.utils.UserContext;
 import com.teachub.promotion.domain.dto.CouponQuery;
 import com.teachub.promotion.domain.po.Coupon;
@@ -23,6 +23,8 @@ import com.teachub.promotion.service.IExchangeCodeService;
 import com.teachub.promotion.service.IUserCouponService;
 import com.teachub.promotion.utils.CodeUtil;
 import lombok.RequiredArgsConstructor;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +33,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -46,19 +49,24 @@ import java.util.stream.Collectors;
 public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCoupon> implements IUserCouponService {
     private final CouponMapper couponMapper;
     private final IExchangeCodeService exchangeCodeService;
-    @Autowired
-    @Lazy
-    private UserCouponServiceImpl userCouponService;
+    private final RedissonClient redissonClient;
 
     @Override
     public void receiveCoupon(Long id) {
         Long userId = UserContext.getUser();
         //悲观锁
-        //Long比对会有问题 转为String调用intern强调从常量池中取对象
-        synchronized (userId.toString().intern()) {
+        String key = "lock:coupon:uid:" + userId;
+        RLock lock = redissonClient.getLock(key);
+        try {
+            boolean isLocked = lock.tryLock(); //看门狗机制生效 默认过期时间30s
+            if (!isLocked) {
+                throw new BizIllegalException("操作太频繁");
+            }
             //从aop上下文获取代理对象
             IUserCouponService iUserCouponService = (IUserCouponService) AopContext.currentProxy();
             iUserCouponService.receiveCopy(id);
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -92,14 +100,16 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
             throw new BizIllegalException("用户已超出领取上限");
         }
         //乐观锁
-        couponMapper.updateIssueNum(coupon.getId());
+        int i = couponMapper.updateIssueNum(coupon.getId());
+        if (i == 0) {
+            throw new BizIllegalException("货存不足");
+        }
         //新增用户优惠券
         this.saveCoupon(coupon);
     }
 
 
     //兑换码兑换优惠券
-    @Transactional
     @Override
     public void exchangeCode(String code) {
         if (StringUtils.isBlank(code)) {
@@ -147,11 +157,12 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
         }
         this.save(userCoupon);
     }
+
     //查询我的优惠券
     @Override
     public PageDTO<CouponVO> queryMyCoupons(CouponQuery couponQuery) {
         Long userId = UserContext.getUser();
-        if(userId==null){
+        if (userId == null) {
             throw new BadRequestException("用户未登陆");
         }
         Page<UserCoupon> page = this.lambdaQuery()
@@ -159,7 +170,7 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
                 .eq(UserCoupon::getStatus, couponQuery.getStatus())
                 .page(couponQuery.toMpPageDefaultSortByCreateTimeDesc());
         List<UserCoupon> records = page.getRecords();
-        if(CollUtils.isEmpty(records)){
+        if (CollUtils.isEmpty(records)) {
             return PageDTO.empty(page);
         }
         Set<Long> collect = records.stream().map(UserCoupon::getCouponId).collect(Collectors.toSet());
@@ -173,6 +184,5 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
             return couponVO;
         }).collect(Collectors.toList());
         return PageDTO.of(page, result);
-
     }
 }
