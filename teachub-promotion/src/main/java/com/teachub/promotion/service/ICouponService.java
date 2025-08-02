@@ -8,6 +8,9 @@ import com.teachub.promotion.domain.dto.CouponQuery;
 import com.teachub.promotion.domain.po.Coupon;
 import com.teachub.promotion.domain.vo.CouponDetailVO;
 import com.teachub.promotion.domain.vo.CouponPageVO;
+import com.teachub.promotion.domain.vo.CouponVO;
+
+import java.util.List;
 
 /**
  * <p>
@@ -32,4 +35,7 @@ public interface ICouponService extends IService<Coupon> {
     void delete(Long id);
 
     void pauseCoupon(Long id);
+
+    List<CouponVO> queryList();
+
 }
