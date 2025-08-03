@@ -1,5 +1,6 @@
 package com.teachub.promotion.service.impl;
 
+import com.alibaba.cloud.commons.lang.StringUtils;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.teachub.api.client.course.CategoryClient;
@@ -9,8 +10,9 @@ import com.teachub.common.exceptions.BadRequestException;
 import com.teachub.common.exceptions.BizIllegalException;
 import com.teachub.common.utils.BeanUtils;
 import com.teachub.common.utils.CollUtils;
-import com.teachub.common.utils.StringUtils;
+import com.teachub.common.utils.DateUtils;
 import com.teachub.common.utils.UserContext;
+import com.teachub.promotion.constants.PromotionConstants;
 import com.teachub.promotion.domain.dto.CouponFormDTO;
 import com.teachub.promotion.domain.dto.CouponIssueFormDTO;
 import com.teachub.promotion.domain.dto.CouponQuery;
@@ -32,17 +34,13 @@ import com.teachub.promotion.service.IExchangeCodeService;
 import com.teachub.promotion.service.IUserCouponService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * <p>
@@ -60,6 +58,8 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
     private final IExchangeCodeService codeService;
     private final CategoryClient categoryClient;
     private final IUserCouponService userCouponService;
+    private final StringRedisTemplate redisTemplate;
+
     //新增优惠券
     @Transactional
     @Override
@@ -105,6 +105,7 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
         return PageDTO.of(page, couponPageVOS);
     }
 
+    //发放优惠券
     @Override
     public void issueCoupon(Long id, CouponIssueFormDTO couponIssueFormDTO) {
         log.info("当前线程名:{}", Thread.currentThread().getName());
@@ -121,7 +122,7 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
         }
         //判断是否立即发放
         LocalDateTime now = LocalDateTime.now();
-        boolean isStartIssue = couponIssueFormDTO.getIssueBeginTime() == null || !couponIssueFormDTO.getIssueEndTime().isAfter(now);
+        boolean isStartIssue = couponIssueFormDTO.getIssueBeginTime() == null || !couponIssueFormDTO.getIssueBeginTime().isAfter(now);
         Coupon coupon = BeanUtils.copyBean(couponIssueFormDTO, Coupon.class);
         if (isStartIssue) {
             coupon.setStatus(CouponStatus.ISSUING);
@@ -130,8 +131,17 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
             coupon.setStatus(CouponStatus.UN_ISSUE);
         }
         this.updateById(coupon);
-
-        //TODO 如果兑换方式是指定发放 要生成兑换码
+        //如果立即发放 存到redis缓存
+        if (isStartIssue) {
+            String key = PromotionConstants.COUPON_CACHE_KEY_PREFIX + id;
+            Map<String, String> map = new HashMap<>();
+            map.put("issueBeginTime", coupon.getIssueBeginTime() == null ? String.valueOf(DateUtils.toEpochMilli(LocalDateTime.now())) : String.valueOf(DateUtils.toEpochMilli(coupon.getIssueBeginTime())));
+            map.put("issueEndTime",String.valueOf(DateUtils.toEpochMilli(coupon.getIssueEndTime())));
+            map.put("totalNum",one.getTotalNum().toString());
+            map.put("userLimit",one.getUserLimit().toString());
+            redisTemplate.opsForHash().putAll(key,map);
+        }
+        // 如果兑换方式是指定发放 要生成兑换码
         if (one.getObtainWay().equals(ObtainType.ISSUE) && one.getStatus().equals(CouponStatus.DRAFT)) {
             one.setIssueEndTime(coupon.getIssueEndTime());
             codeService.asyncCreateCode(one);
@@ -151,6 +161,7 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
         }
         Coupon po = BeanUtils.copyBean(dto, Coupon.class);
         this.updateById(po);
+        //是否限定分类
         if (po.getSpecific() != null && po.getSpecific()) {
             List<Long> scopes = dto.getScopes();
             List<CouponScope> collect = scopes.stream().map(scopeId -> {
@@ -172,6 +183,7 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
             throw new BizIllegalException("优惠券不存在");
         }
         CouponDetailVO couponDetailVO = BeanUtils.copyBean(coupon, CouponDetailVO.class);
+        //查看限定的分类信息
         if (coupon.getSpecific() != null && coupon.getSpecific()) {
             List<CouponScope> list = couponScopeService.lambdaQuery()
                     .eq(CouponScope::getCouponId, id)
@@ -188,15 +200,16 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
         }
         return couponDetailVO;
     }
+
     //删除优惠券
     @Override
     public void delete(Long id) {
         this.removeById(id);
         couponScopeService.lambdaUpdate()
-                .eq(CouponScope::getCouponId,id)
+                .eq(CouponScope::getCouponId, id)
                 .remove();
         codeService.lambdaUpdate()
-                .eq(ExchangeCode::getExchangeTargetId,id)
+                .eq(ExchangeCode::getExchangeTargetId, id)
                 .remove();
     }
 
@@ -204,7 +217,7 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
     @Override
     public void pauseCoupon(Long id) {
         this.lambdaUpdate()
-                .eq(Coupon::getId,id)
+                .eq(Coupon::getId, id)
                 .set(Coupon::getStatus, CouponStatus.PAUSE)
                 .update();
     }
@@ -241,12 +254,13 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
         return list.stream().map(po -> {
             CouponVO couponVO = BeanUtils.copyBean(po, CouponVO.class);
             //优惠券是否超出领取上限
-            boolean isAvl = po.getIssueNum() < po.getTotalNum() && couponMap.getOrDefault(po.getId(),0L) < po.getUserLimit();
+            boolean isAvl = po.getIssueNum() < po.getTotalNum() && couponMap.getOrDefault(po.getId(), 0L) < po.getUserLimit();
             couponVO.setAvailable(isAvl);
-            boolean isRec = unusedCouponMap.getOrDefault(po.getId(), 0L)>0;
+            boolean isRec = unusedCouponMap.getOrDefault(po.getId(), 0L) > 0;
             couponVO.setReceived(isRec);
             return couponVO;
         }).collect(Collectors.toList());
     }
+
 
 }
