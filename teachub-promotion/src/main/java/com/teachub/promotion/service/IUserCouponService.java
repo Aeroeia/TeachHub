@@ -2,10 +2,14 @@ package com.teachub.promotion.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.teachub.common.domain.dto.PageDTO;
+import com.teachub.promotion.domain.dto.CouponDiscountDTO;
 import com.teachub.promotion.domain.dto.CouponQuery;
+import com.teachub.promotion.domain.dto.OrderCourseDTO;
 import com.teachub.promotion.domain.dto.UserCouponDTO;
 import com.teachub.promotion.domain.po.UserCoupon;
 import com.teachub.promotion.domain.vo.CouponVO;
+
+import java.util.List;
 
 /**
  * <p>
@@ -26,4 +30,6 @@ public interface IUserCouponService extends IService<UserCoupon> {
     PageDTO<CouponVO> queryMyCoupons(CouponQuery couponQuery);
 
     void saveCoupon(UserCouponDTO couponDTO);
+
+    List<CouponDiscountDTO> findDiscountSolution(List<OrderCourseDTO> courseDTOS);
 }
