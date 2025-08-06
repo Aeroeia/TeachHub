@@ -29,7 +29,7 @@ public interface IUserCouponService extends IService<UserCoupon> {
 
     PageDTO<CouponVO> queryMyCoupons(CouponQuery couponQuery);
 
-    void saveCoupon(UserCouponDTO couponDTO);
+    void saveCoupon(UserCouponDTO dto);
 
-    List<CouponDiscountDTO> findDiscountSolution(List<OrderCourseDTO> courseDTOS);
+    List<CouponDiscountDTO> findDiscountSolution(List<OrderCourseDTO> courseDTOS) throws InterruptedException;
 }

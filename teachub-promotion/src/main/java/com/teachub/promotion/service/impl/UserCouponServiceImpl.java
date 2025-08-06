@@ -1,7 +1,7 @@
 package com.teachub.promotion.service.impl;
 
+
 import cn.hutool.core.bean.copier.CopyOptions;
-import cn.hutool.db.sql.Order;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.teachub.common.autoconfigure.mq.RabbitMqHelper;
@@ -39,15 +39,15 @@ import com.teachub.promotion.utils.CodeUtil;
 import com.teachub.promotion.utils.PermuteUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.aspectj.weaver.ast.Or;
-import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -220,7 +220,7 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
 
     //查询优惠券方案
     @Override
-    public List<CouponDiscountDTO> findDiscountSolution(List<OrderCourseDTO> courseDTOS) {
+    public List<CouponDiscountDTO> findDiscountSolution(List<OrderCourseDTO> courseDTOS) throws InterruptedException {
         //查询我的可用优惠券
         Long userId = UserContext.getUser();
         List<Coupon> coupons = this.getBaseMapper().queryMyCoupon(userId);
@@ -251,13 +251,30 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
         //将单券加入组合
         avaCoupons.forEach(c -> permute.add(List.of(c)));
         log.debug("排列组合数:{}", permute.size());
-        //计算每种优惠
+        /*计算每种优惠
         log.debug("开始计算每一种优惠");
         List<CouponDiscountDTO> discountDTOList = new ArrayList<>();
         for (List<Coupon> solution : permute) {
             CouponDiscountDTO dto = calculateSolution(solution, map, courseDTOS);
             log.debug("优惠券id:{},rules:{},最终优惠:{}", dto.getIds(), dto.getRules(), dto.getDiscountAmount());
             discountDTOList.add(dto);
+        }
+        */
+        //采用多线程计算每种优惠
+        CountDownLatch latch = new CountDownLatch(permute.size());
+        List<CouponDiscountDTO> discountDTOList = Collections.synchronizedList(new ArrayList<>(permute.size()));
+        for(List<Coupon> solution : permute){
+            CompletableFuture.supplyAsync(()->{
+                CouponDiscountDTO dto = calculateSolution(solution, map, courseDTOS);
+                return dto;
+            }).thenAccept(dto -> {
+                log.debug("优惠券id:{},rules:{},最终优惠:{}", dto.getIds(), dto.getRules(), dto.getDiscountAmount());
+                discountDTOList.add(dto);
+                latch.countDown();
+            });
+        }
+        if(!latch.await(30, TimeUnit.SECONDS)){
+            throw new BizIllegalException("计算优惠超时");
         }
         return discountDTOList;
     }
