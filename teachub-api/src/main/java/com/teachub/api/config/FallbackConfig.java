@@ -4,6 +4,7 @@ import com.teachub.api.client.learning.fallback.LearningClientFallback;
 import com.teachub.api.client.remark.fallback.RemarkClientFallBackFactory;
 import com.teachub.api.client.trade.fallback.TradeClientFallback;
 import com.teachub.api.client.user.fallback.UserClientFallback;
+import com.teachub.api.promotion.fallback.PromotionFallBackFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -29,5 +30,9 @@ public class FallbackConfig {
         return new RemarkClientFallBackFactory();
     }
 
+    @Bean
+    public PromotionFallBackFactory promotionFallBackFactory(){
+        return new PromotionFallBackFactory();
+    }
 
 }
