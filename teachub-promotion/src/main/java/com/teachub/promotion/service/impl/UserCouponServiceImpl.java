@@ -1,6 +1,5 @@
 package com.teachub.promotion.service.impl;
 
-
 import cn.hutool.core.bean.copier.CopyOptions;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -38,15 +37,16 @@ import com.teachub.promotion.service.IUserCouponService;
 import com.teachub.promotion.utils.CodeUtil;
 import com.teachub.promotion.utils.PermuteUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
-
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -67,6 +67,7 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
     private final StringRedisTemplate redisTemplate;
     private final RabbitMqHelper rabbitMqHelper;
     private final ICouponScopeService couponScopeService;
+    private final Executor calculateSolutionExecutor;
 
     @Override
     @MyLock(lockType = MyLockType.RE_ENTRANT_LOCK, key = "lock:coupon:id:#{id}")
@@ -266,17 +267,54 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
         for(List<Coupon> solution : permute){
             CompletableFuture.supplyAsync(()->{
                 CouponDiscountDTO dto = calculateSolution(solution, map, courseDTOS);
+                log.debug("当前线程:{}",Thread.currentThread().getName());
                 return dto;
-            }).thenAccept(dto -> {
+            },calculateSolutionExecutor).thenAccept(dto -> {
                 log.debug("优惠券id:{},rules:{},最终优惠:{}", dto.getIds(), dto.getRules(), dto.getDiscountAmount());
                 discountDTOList.add(dto);
                 latch.countDown();
             });
         }
-        if(!latch.await(30, TimeUnit.SECONDS)){
+        if(!latch.await(30,TimeUnit.SECONDS)){
             throw new BizIllegalException("计算优惠超时");
         }
-        return discountDTOList;
+        //筛选最优解
+        return findBestSolutions(discountDTOList);
+    }
+
+    /**
+     * 筛选最优解决方案
+     * @param discountDTOList 每种优惠方案
+     * @return 最优方案
+     */
+    private List<CouponDiscountDTO> findBestSolutions(List<CouponDiscountDTO> discountDTOList) {
+        //相同券取金额最大
+        Map<String,CouponDiscountDTO> moreDiscounts = new HashMap<>();
+        //相同金额取券最少
+        Map<Integer,CouponDiscountDTO> lessCoupons = new HashMap<>();
+        for(CouponDiscountDTO dto : discountDTOList){
+            //拼接ids
+            String ids = dto.getIds().stream().
+                    sorted(Long::compare).map(String::valueOf)
+                    .collect(Collectors.joining(","));
+            //从集合中取对比是否金额更大
+            CouponDiscountDTO old = moreDiscounts.get(ids);
+            if(old!=null&&old.getDiscountAmount()>=dto.getDiscountAmount()){
+                continue;
+            }
+            //从集合中取对比是否券更少
+            old =  lessCoupons.get(dto.getDiscountAmount());
+            if(old!=null&&old.getIds().size()>1&&old.getIds().size()<dto.getIds().size()){
+                continue;
+            }
+            //将方案添加
+            moreDiscounts.put(ids,dto);
+            lessCoupons.put(dto.getDiscountAmount(),dto);
+        }
+        //取交集
+        Collection<CouponDiscountDTO> intersection = CollUtils.intersection(lessCoupons.values(), moreDiscounts.values());
+        return intersection.stream().sorted((o1,o2)->Long.compare(o2.getDiscountAmount(),o1.getDiscountAmount()))
+                .collect(Collectors.toList());
     }
 
     /**
