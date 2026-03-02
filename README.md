@@ -1,5 +1,16 @@
 # 课表模块
 
+**项目中MQ的使用**
+
+> 订单支付模块和学习模块是解耦的 用户在购买课程或者退款后会通过MQ异步发送给学习服务 自动将用户购买的课程加入/删除到用户课表中
+
+**要是消息丢失怎么办**
+
+> 对于消息丢失一般有两种解决方案 一种是MQ中设置同步刷盘后再返回ack 如果使用集群的话等待副本都写入日志后才返回ack 另外一种则是通过操作记录 定期比对操作记录进行补偿
+>
+> 但是MQ同步刷盘的话性能会显著下降 因此一般不采用这种机制
+> 而操作记录一般在重要业务中才会使用到 对于加入课表这个业务消息丢了的情况下让用户从订单中手动把课程到课表或者联系客服加入即可
+
 **LearningLessonController**
 
 由于课表中学习进度、学习时间、最近学习课程经常发生变更，还有排序的业务 而且每个用户需要单独存一份 所以不适合存入redis缓存
@@ -21,9 +32,7 @@
 
 - 消费者
 
-tj-learning进行消息监听，监听到消息后通过rpc调用course服务通过课程id查询课程信息并将课表信息加入learning数据库
-
-![image-20251015175954160](assets/image-20251015175954160.png)
+teachub-learning进行消息监听，监听到消息后通过rpc调用course服务通过课程id查询课程信息并将课表信息加入learning数据库
 
 - 生产者
 
@@ -34,13 +43,6 @@ tj-learning进行消息监听，监听到消息后通过rpc调用course服务通
 
 ------
 
-### 想法&流程
-
-- 支付/退款后异步同步课表
-- 如果消息丢失 用户手动添加到课表或者找客服
-
-------
-
 ## 分页查询我的课表
 
 - rpc调用课表服务获取基本信息写入课表
@@ -48,24 +50,10 @@ tj-learning进行消息监听，监听到消息后通过rpc调用course服务通
 
 ![image-20251015203716844](assets/image-20251015203716844.png)
 
-### 想法&流程
+### 想法
 
 - 考虑到课表中学习进度、学习时间、最近学习课程经常发生变更，还有排序的业务 而且每个用户需要单独存一份 所以不适合存入redis缓存
 - 缓存命中率不高而且为每个用户维护缓存内存占用极大
-
-------
-
-## 创建学习计划
-
-![image-20251016181357663](assets/image-20251016181357663.png)没什么可说的 传入后直接修改数据库中数据就完事了
-
-------
-
-## 查询我的学习计划
-
-![image-20251016181821080](assets/image-20251016181821080.png)
-
-也没什么可说的 调个课程api获取课程信息 拼接一下返回就可以
 
 ------
 
@@ -75,19 +63,38 @@ tj-learning进行消息监听，监听到消息后通过rpc调用course服务通
 
 整体流程如图：
 
-![image-20251018130753214](assets/image-20251018130753214.png)
+```mermaid
+graph TD
+    subgraph 交易服务
+        A([开始]) --> B[购买/报名课程]
+        B --> C[支付]
+        C --> D([结束])
+    end
+
+    C -.->|MQ异步通知| E
+
+    subgraph 学习服务
+        E[加入课表] --> F{是否有学习计划}
+        F -- 未学习 --> G[创建学习计划]
+        F -- 已学习 --> H[开始/继续学习]
+        G --> H
+        H --> I{是否过期}
+        I -- 已失效 --> J([结束])
+        I -- 未过期 --> K{是否学完}
+        K -- 已学完 --> L([结束])
+        K -- 未学完 --> H
+    end
+```
 
 ------
 
 ## 查询学习记录
 
-![image-20251016180917693](assets/image-20251016180917693.png)
-
 **给课程服务rpc调用**
 
 ![image-20251016192147510](assets/image-20251016192147510.png)
 
-![image-20251016185110864](assets/image-20251016185110864.png)
+![image-20260303023559671](assets/image-20260303023559671.png)
 
 - 获取当前登录用户id
 - 根据courseId和userId查询LearningLesson
@@ -104,20 +111,79 @@ tj-learning进行消息监听，监听到消息后通过rpc调用course服务通
 
 ## 提交学习记录	
 
-![image-20251016181529176](assets/image-20251016181529176.png)
-
 - 考试比较简单，只要提交了就说明这一节学完了。
 - 视频比较麻烦，需要记录用户的播放进度，进度超过50%才算学完。因此视频播放的过程中需要不断提交播放进度到服务端，而服务端则需要保存学习记录到数据库
 
 提交学习记录处理流程如图：
 
-![image-20251018130903666](assets/image-20251018130903666.png)
+```mermaid
+flowchart TD
+    Start([开始]) --> Submit[提交学习记录]
+    Submit --> IsExam{是否是考试}
+    
+    IsExam -- 是 --> AddRecord[新增学习记录]
+    AddRecord --> Progress[课表已学习小节数量 +1]
+    Progress --> IsAllDone{是否学完全部小节}
+    IsAllDone -- 是 --> UpdateStatus[更新课表状态为已学完]
+    UpdateStatus --> End([结束])
+    IsAllDone -- 否 --> End
+
+    IsExam -- 否 --> Exists{记录是否已经存在}
+    Exists -- 否 --> NewRecord[新增学习记录]
+    NewRecord --> UpdateInfo[更新课表最近学习信息]
+    UpdateInfo --> End
+
+    Exists -- 是 --> FirstDone{是否是第一次学完}
+    FirstDone -- 是 --> UpdateRecord[更新学习记录]
+    UpdateRecord --> Progress
+    FirstDone -- 否 --> UpdateInfo
+```
+
+
 
 ------
 
 ## 高并发优化学习记录提交
 
-![image-20251018131000600](assets/image-20251018131000600.png)
+**流程**
+
+> 项目中原本的设计是前端维护一个定时器 每15秒将用户当前的视频播放进度提交然后更新数据库 这种设计对数据库的压力是很大的 然后我就采用了Redis缓存+Java的这个DelayQueue的方式进行改造 前端提交播放进度的时候先在Redis中修改进度 同时提交一个20s的延迟任务 取任务时通过线程池进行进度对比 如果延迟任务和Redis所记录的一样就说明没有更新的记录提交了 代表用户已经离开 然后就将记录同步到数据库中 当然了可能出现Redis丢消息导致Redis中的进度和延迟队列中的对不上 但是这个业务对数据一致性不那么敏感 因此可以容忍
+
+**流程图：**
+
+```mermaid
+flowchart TD
+    Start([开始]) --> Submit[提交学习记录]
+    Submit --> IsExam{是否是考试}
+    
+    IsExam -- 是 --> AddRecord[新增学习记录]
+    AddRecord --> Progress[课表已学习小节数量 +1]
+    Progress --> End([结束])
+
+    IsExam -- 否 --> Exists{记录是否已经存在}
+    Exists -- 否 --> NewRecord[新增学习记录]
+    NewRecord --> End
+
+    Exists -- 是 --> FirstDone{是否是第一次学完}
+    FirstDone -- 是 --> UpdateRecord[更新学习记录]
+    UpdateRecord --> ClearCache[清理 Redis 缓存]
+    ClearCache --> Progress
+    
+    FirstDone -- 否 --> CacheToRedis[缓存到 Redis]
+    CacheToRedis --> DelayTask{{提交延迟检测任务 - 20s}}
+
+    subgraph 异步任务池
+        DelayTask -.-> QueryCache[查询 Redis 缓存]
+        QueryCache --> Compare{数据是否一致}
+        Compare -- 是 --> DBUpdate[更新学习记录与课表]
+        Compare -- 否 --> TaskEnd([结束])
+        DBUpdate --> TaskEnd
+    end
+    
+    DelayTask --> End
+```
+
+
 
 变化最大的有两点：
 
@@ -145,9 +211,7 @@ tj-learning进行消息监听，监听到消息后通过rpc调用course服务通
   - 是：更新课表状态为已学完
   - 否：结束
 
-### Redis中数据结构
 
-![image-20251017021142860](assets/image-20251017021142860.png)
 
 ### 延迟队列进行优化
 
@@ -158,13 +222,6 @@ tj-learning进行消息监听，监听到消息后通过rpc调用course服务通
 ------
 
 # 问答模块
-
-**InteractionQuestionController**
-**InteractionReplyController**
-
-![image-20251017102001709](assets/image-20251017102001709.png)
-
-------
 
 ## 新增问题回答与查询问题回答
 
@@ -251,7 +308,7 @@ redisTemplate.opsForHash().putAll(statsKey, stats);
 
 **优化点**
 
-![image-20251018131520737](assets/image-20251018131520737.png)
+![image-20260303022640886](assets/image-20260303022640886.png)
 
 - 课程信息可以进行hash缓存 缓存时间可以稍长 因为这个不怎么会进行改变
 - 目录、章节信息同上
@@ -277,15 +334,78 @@ redisTemplate.opsForHash().putAll(statsKey, stats);
 
 # 点赞系统
 
+**最终改进：**
+
+- 一个set存postId-userId映射 设置过期时间 访问可以续期 过期后从db读取
+- 一个set/list存新增用户id 通过定时任务更新db 注意要用lua保证原子性 不然多实例下会造成新来的被删掉的情况
+- 点赞总数不必再通过zset更新了 读取set即可
+
+浏览数：
+
+- 通过String存储 访问则自增 过期就从db读取
+
+**初版**
+
+> 通过Redis中set结构存储用户点赞行为 key为点赞业务的Id 里面存储点赞过的用户 这样在分页查询的时就可以快速判断用户是否点过赞（如果key过期 重新在Mysql读取） 用户点赞时在数据库中进行记录并写入Redis 通过一个定时任务(20s) 定时将点赞数通过MQ同步到业务中 防止消息丢失产生的问题 可以在人流量不高的时候（深夜） 通过rpc比对业务中点赞数和记录中是否一致 用户点赞后计算当前业务下点赞数 并更新到zset中 定时任务更新的时候可以通过popMin方法取出同步 冷热分离
+
+**为什么利用Zset结构来存储？**
+
+> 这里zset相当于一个中间集合 用户点赞后将更新后的点赞数写入到zset 这样就知道哪些数据是需要更新的 而不用每次定时任务同步的时候都将所有业务同步一遍 这样性能损耗较大
+> 使用zset的好处就是zset的提供popMin的原子性删除操作，同时通过id更新方便
+
+**如果Redis消息丢了怎么办**
+
+> 通过一个定时任务 在深夜的时候比对Redis中记录和数据库记录是否一致 并且比对业务点赞数量是否一致
+
+点赞服务抽取成一个单独的微服务 因为必要时可以支持多种不同业务的点赞功能
+
 ## 新增点赞/取消点赞
 
-![image-20251018155934209](assets/image-20251018155934209.png)
+```mermaid
+flowchart TD
+    Start([开始]) --> IsLike{是否是点赞}
+    
+    IsLike -- 是 --> CheckLiked{是否点过赞}
+    CheckLiked -- 否 --> AddRecord[新增点赞记录]
+    
+    IsLike -- 否 --> CheckUnLiked{是否点过赞}
+    CheckUnLiked -- 是 --> DelRecord[删除点赞记录]
+    
+    AddRecord --> Count[统计点赞数]
+    DelRecord --> Count
+    Count --> MQ[MQ通知业务方]
+    MQ --> End([结束])
+    
+    CheckLiked -- 是 --> End
+    CheckUnLiked -- 否 --> End
+```
+
+
 
 需要统计点赞数再发送给mq是因为由于网络问题用户可能点了两次赞
 
 **改进**
 
-![image-20251018161532303](assets/image-20251018161532303.png)
+```mermaid
+flowchart TD
+    Start([开始]) --> Input[提交点赞信息]
+    Input --> RedisCheck{点赞记录是否存在缓存}
+    
+    RedisCheck -- 是 --> End([结束])
+    
+    RedisCheck -- 否 --> SADD[Redis SADD 新增记录]
+    SADD --> RedisIncr[Redis 统计点赞数量]
+    RedisIncr --> MQ[MQ通知业务服务]
+    
+    subgraph 性能优化层
+        MQ --> ReadTask[定期读取缓存中的点赞数量]
+        ReadTask --> BatchWrite[批量写数据库: 更新点赞数 -N]
+    end
+    
+    MQ --> End
+```
+
+
 
 - 采用redis的set结构记录每个bizId下的点赞用户
 - 基于redis更新/查询点赞相关业务 并定期落库~~（或者我觉得可以点赞双写数据库和缓存，查询时查缓存）~~
@@ -296,52 +416,15 @@ redisTemplate.opsForHash().putAll(statsKey, stats);
 
 ![image-20251018175327847](assets/image-20251018175327847.png)
 
-**Redis数据结构：Set**
-
-![image-20251018162718885](assets/image-20251018162718885.png)
-
-> 有同学会担心，如果点赞数据非常庞大，达到数百亿，那么该怎办呢？
->
-> 大多数企业根本达不到这样的规模，如果真的达到也没有关系。这个时候我们可以将Redis与数据库结合。
->
-> - 先利用Redis来记录点赞状态
-> - 并且定期的将Redis中的点赞状态持久化到数据库
-> - 对于历史点赞记录，比如下架的课程、或者超过2年以上的访问量较低的数据都可以从redis移除，只保留在数据库中
-> - 当某个记录点赞时，优先去Redis查询并判断，如果Redis中不存在，再去查询数据库数据并缓存到Redis
-
-------
-
-## 统计点赞数
-
-**Redis数据结构：Zset**
-
-![image-20251018162744523](assets/image-20251018162744523.png)
-
-> 如果是从节省内存角度来考虑，Hash结构无疑是最佳的选择；但是考虑到将来我们要从Redis读取点赞数，然后移除（避免重复处理）。为了保证线程安全，查询、移除操作必须具备原子性。而SortedSet则提供了几个移除并获取的功能，天生具备原子性。并且我们每隔一段时间就会将数据从Redis移除，并不会占用太多内存。因此，这里我们计划使用SortedSet结构。
-
-**点赞数落库**
-
-![image-20251018162821388](assets/image-20251018162821388.png)
-
-由于目前查询问答系统是基于数据库的 所以这种方案没什么问题 但其实也会有20秒延迟  
-
-### 想法&流程
-
-- 点赞时通过redis的Hash中进行统计 但要通过lua脚本或者加锁保证原子
-
-- 点赞记录通过mq异步发送落库
-
-  > 对比使用异步线程池好处：
-  >
-  > 1. 消费者可以根据自身能力进行消费 不用额外开辟线程去消费
-  > 2. 假设jvm宕机了 这条消息就丢失了 如果发送mq 还有其他jvm可以消费
-  > 3. mq有重试机制 
-
-- 定期清理redis中点赞记录 对于冷数据访问到没有再重新从数据库中加载
-
 ------
 
 # 积分系统
+
+> 签到的时候数据库写入一条记录 同时在bitmap进行记录 通过异步线程更新zset中的积分
+>
+> 异步线程能防止消息丢失且执行速度快 实时性高
+>
+> Redis可能丢消息 解决方法就是定时进行记录比对 用户反馈、榜单结算时再进行检查
 
 ## 用户签到
 
@@ -393,13 +476,26 @@ redisTemplate.opsForHash().putAll(statsKey, stats);
 
 # 排行榜
 
-![image-20251019031041927](assets/image-20251019031041927.png)
-
 ## 实时排行榜
 
-> 实时排行榜是根据Redis中zset进行的 zset中key为用户id score是用户的积分 因此天然实现了排行榜排序 当用户积分变动时 比如用户签到获得了积分 则异步更新到zset榜中 结算时间是每月月底 这时候通过xxl-job定时任务并结合mybatisplus动态表名创建新表存入历史榜单数据 
+```mermaid
+flowchart TD
+    Start([开始]) --> HasLimit{是否有积分上限}
+    
+    HasLimit -- 否 --> SaveDB[保存积分记录]
+    
+    HasLimit -- 是 --> QueryToday[查询今日已得积分]
+    QueryToday --> OverLimit{是否超出积分上限}
+    OverLimit -- 是 --> End([结束])
+    OverLimit -- 否 --> SaveDB
+    
+    SaveDB --> AddRedis[累加积分到 Redis ZSet 榜单]
+    AddRedis --> End
+```
 
-![image-20251019100719480](assets/image-20251019100719480.png)
+
+
+> 实时排行榜是根据Redis中zset进行的 zset中key为用户id score是用户的积分 因此天然实现了排行榜排序 当用户积分变动时 比如用户签到获得了积分 则异步更新到zset榜中 结算时间是每月月底 这时候通过xxl-job定时任务并结合mybatisplus动态表名创建新表存入历史榜单数据 
 
 - 使用Zset进行积分排序
 - 新增积分记录同时修改Redis中Zset数据
@@ -408,8 +504,6 @@ redisTemplate.opsForHash().putAll(statsKey, stats);
 ## 历史排行榜
 
 - 分库分表
-
-  ![image-20251019113839460](assets/image-20251019113839460.png)
 
 - 定时任务每个赛季初生成上赛季榜单
 
@@ -499,7 +593,17 @@ public void savePointsBoard2DB(){
 
 - 利用XXL-JOB的任务链执行
 
-  ![image-20251019120633730](assets/image-20251019120633730.png)
+  ```mermaid
+  graph LR
+      Step1(1.创建新赛季榜单表) --> Step2(2.持久化Redis上赛季数据)
+      Step2 --> Step3(3.清理Redis旧榜单缓存)
+      
+      style Step1 fill:#f96,stroke:#333
+      style Step2 fill:#f96,stroke:#333
+      style Step3 fill:#f96,stroke:#333
+  ```
+  
+  
 
 ------
 
@@ -556,11 +660,7 @@ public void savePointsBoard2DB(){
 
 - 防刷校验算法
 
-  - ![image-20251019181718298](assets/image-20251019181718298.png)
   - 准备16组秘钥。在兑换码自增id前拼接一个4位的**新鲜值**，可以是随机的。这个值是多少，就取第几组秘钥
-  - 最终![image-20251019182013518](assets/image-20251019182013518.png)
-
-  
 
 ### 算法实现
 
@@ -623,7 +723,29 @@ public void savePointsBoard2DB(){
 > 通过MQ异步扣减数据库（削峰填谷）在Redis和Mysql分别加入记录对账
 > 如果redis宕机导致没成功 那么就会导致超卖情况 解决方法就是在兑换码加唯一索引
 
-![image-20251020005115971](assets/image-20251020005115971.png)
+```mermaid
+flowchart TD
+    Start([开始]) --> Query[查询优惠券信息]
+    Query --> Exists{是否存在}
+    
+    Exists -- 否 --> Err[返回异常结果]
+    Exists -- 是 --> Granting{是否正在发放}
+    
+    Granting -- 否 --> Err
+    Granting -- 是 --> Stock{库存是否充足}
+    
+    Stock -- 否 --> Err
+    Stock -- 是 --> UserLimit{是否超出限领数量}
+    
+    UserLimit -- 是 --> Err
+    UserLimit -- 否 --> Success[优惠券已发放数量 +1]
+    
+    Success --> CreateUserCoupon[生成用户优惠券]
+    CreateUserCoupon --> End([结束])
+    Err --> End
+```
+
+
 
 - 加分布式锁 以优惠券id为key
 - 基于Redis进行校验、扣减库存
